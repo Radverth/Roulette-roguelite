@@ -15,9 +15,10 @@ func check_for_updates() -> void:
 	if _checking:
 		return
 	_checking = true
+	var current := ProjectSettings.get_setting("application/config/version", "1.0.0") as String
 	var err := _http.request(
 		Constants.GITHUB_API_LATEST,
-		["User-Agent: VelvetSpin/" + Constants.APP_VERSION, "Accept: application/vnd.github+json"]
+		["User-Agent: VelvetSpin/" + current, "Accept: application/vnd.github+json"]
 	)
 	if err != OK:
 		_checking = false
@@ -47,7 +48,8 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 	if download_url.is_empty() and data.has("html_url"):
 		download_url = str(data["html_url"])
 
-	if _is_newer(remote_version, Constants.APP_VERSION):
+	var current_version := ProjectSettings.get_setting("application/config/version", "1.0.0") as String
+	if _is_newer(remote_version, current_version):
 		emit_signal("update_available", remote_version, download_url)
 	else:
 		emit_signal("update_check_done")

@@ -1,6 +1,7 @@
 extends Node
 
-const APP_VERSION := "1.0.0"
+var APP_VERSION: String:
+	get: return ProjectSettings.get_setting("application/config/version", "1.0.0")
 const GITHUB_OWNER := "radverth"
 const GITHUB_REPO := "roulette-roguelite"
 const GITHUB_API_LATEST := "https://api.github.com/repos/radverth/roulette-roguelite/releases/latest"
