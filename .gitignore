@@ -1,0 +1,15 @@
+# Godot
+.godot/
+*.import
+*.translation
+*.uid
+
+# Build output
+build/
+
+# Temp / CI artifacts
+assets_extract/
+
+# OS
+.DS_Store
+Thumbs.db
