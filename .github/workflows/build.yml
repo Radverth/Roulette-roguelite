@@ -1,0 +1,154 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "version.txt"
+      - "project.godot"
+
+env:
+  GODOT_VERSION: "4.3"
+  EXPORT_PRESET: "Android"
+  APK_NAME: "velvet_spin"
+
+jobs:
+  build-android:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and build tools
+        run: |
+          sdkmanager --install \
+            "ndk;23.2.8568313" \
+            "build-tools;34.0.0" \
+            "platforms;android-34" \
+            "cmake;3.22.1" \
+            2>&1 | tail -5
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        run: |
+          wget -q \
+            "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64.zip" \
+            -O /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot_bin
+          chmod +x "/tmp/godot_bin/Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64"
+          sudo cp "/tmp/godot_bin/Godot_v${{ env.GODOT_VERSION }}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: Download Godot Export Templates
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable"
+          wget -q \
+            "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz" \
+            -O /tmp/templates.tpz
+          unzip -q /tmp/templates.tpz -d /tmp/templates_raw
+          cp /tmp/templates_raw/templates/* \
+            "$HOME/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/"
+          echo "Export templates installed."
+
+      - name: Configure Godot Editor Settings
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" << 'SETTINGS'
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/android_sdk_path = "/usr/local/lib/android/sdk"
+          export/android/debug_keystore = ""
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          SETTINGS
+
+      - name: Bump version
+        id: bump
+        run: |
+          OLD=$(cat version.txt | tr -d '[:space:]')
+          IFS='.' read -ra V <<< "$OLD"
+          NEW="${V[0]}.${V[1]}.$((${V[2]}+1))"
+          echo "$NEW" > version.txt
+          sed -i "s|config/version=\"[^\"]*\"|config/version=\"$NEW\"|" project.godot
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Bumped: $OLD → $NEW"
+
+      - name: Set up keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
+            KSIGN_PATH="/tmp/release.keystore"
+            KSIGN_ALIAS="${{ secrets.KEYSTORE_ALIAS }}"
+            KSIGN_PASS="${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "Using release keystore from secrets."
+          else
+            keytool -genkey -v \
+              -keystore /tmp/velvet_spin.keystore \
+              -alias velvetspin \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "android" -keypass "android" \
+              -dname "CN=Velvet Spin,O=Velvet Games,C=US" 2>&1 || true
+            KSIGN_PATH="/tmp/velvet_spin.keystore"
+            KSIGN_ALIAS="velvetspin"
+            KSIGN_PASS="android"
+            echo "Using generated debug keystore."
+          fi
+          sed -i "s|keystore/release=\"\"|keystore/release=\"$KSIGN_PATH\"|" export_presets.cfg
+          sed -i "s|keystore/release_user=\"\"|keystore/release_user=\"$KSIGN_ALIAS\"|" export_presets.cfg
+          sed -i "s|keystore/release_password=\"\"|keystore/release_password=\"$KSIGN_PASS\"|" export_presets.cfg
+
+      - name: Create output directory
+        run: mkdir -p build/android
+
+      - name: Import Godot project
+        run: |
+          godot --headless --import 2>&1 || true
+          echo "Import complete."
+
+      - name: Export APK
+        run: |
+          godot --headless \
+            --export-release "${{ env.EXPORT_PRESET }}" \
+            "build/android/${{ env.APK_NAME }}.apk" \
+            2>&1
+          ls -lh build/android/
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.txt project.godot
+          git diff --staged --quiet || git commit -m "chore: bump version to ${{ steps.bump.outputs.version }} [skip ci]"
+          git push
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.bump.outputs.version }}"
+          name: "Velvet Spin v${{ steps.bump.outputs.version }}"
+          body: |
+            ## Velvet Spin v${{ steps.bump.outputs.version }}
+
+            ### Install
+            1. Download `${{ env.APK_NAME }}.apk` below
+            2. On your Android device: Settings → Security → enable **Install unknown apps**
+            3. Open the downloaded APK and install
+
+            ### What's new
+            _Auto-built from commit ${{ github.sha }}_
+          files: "build/android/${{ env.APK_NAME }}.apk"
+          token: ${{ secrets.GITHUB_TOKEN }}
