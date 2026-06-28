@@ -55,7 +55,7 @@ func _build_ui() -> void:
 		root.add_child(boss_info)
 
 	var chips_lbl := Label.new()
-	chips_lbl.text = "Your chips: %d" % GameManager.chips
+	chips_lbl.text = "%d chips" % GameManager.chips
 	chips_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	chips_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	chips_lbl.add_theme_font_size_override("font_size", 32)
@@ -98,19 +98,7 @@ func _build_ui() -> void:
 	root.add_child(continue_btn)
 
 func _boss_label() -> Control:
-	if not GameManager.is_boss_floor:
-		return null
-	var next_floor := GameManager.floor_number + 1
-	if next_floor % Constants.FLOORS_BEFORE_BOSS != 0:
-		return null
-	var upcoming_boss_idx := randi() % Constants.BOSS_MODIFIERS.size()
-	var mod := Constants.BOSS_MODIFIERS[upcoming_boss_idx]
-	var lbl := Label.new()
-	lbl.text = "⚠  Next floor: BOSS — %s: %s" % [mod.name, mod.desc]
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
-	lbl.add_theme_font_size_override("font_size", 24)
-	return lbl
+	return null
 
 func _build_card_panel(card: Dictionary, chips_lbl: Label) -> Control:
 	var rarity: String = card.get("rarity", "common")
@@ -189,7 +177,7 @@ func _build_card_panel(card: Dictionary, chips_lbl: Label) -> Control:
 		GameManager.add_card(card)
 		buy_btn.disabled = true
 		buy_btn.text = "PURCHASED"
-		chips_lbl.text = "Your chips: %d" % GameManager.chips
+		chips_lbl.text = "%d chips" % GameManager.chips
 		AudioManager.play_card_pickup()
 	)
 	vbox.add_child(buy_btn)
@@ -228,7 +216,7 @@ func _build_sell_section(chips_lbl: Label) -> Control:
 		btn.pressed.connect(func():
 			GameManager.remove_card(card.id)
 			GameManager.add_chips(sell_price)
-			chips_lbl.text = "Your chips: %d" % GameManager.chips
+			chips_lbl.text = "%d chips" % GameManager.chips
 			btn.queue_free()
 		)
 		row.add_child(btn)
@@ -240,7 +228,6 @@ func _on_continue() -> void:
 	if not GameManager.has_card("velvet_hand"):
 		GameManager.owned_cards.clear()
 		GameManager.emit_signal("cards_changed")
-	GameManager.advance_floor()
 	get_tree().change_scene_to_file("res://scenes/Game.tscn")
 
 func _make_btn(text: String, color: Color) -> Button:
