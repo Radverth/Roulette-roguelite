@@ -294,6 +294,8 @@ func _build_chip_selector() -> Control:
 func _make_chip_button(value: int) -> Button:
 	var btn := Button.new()
 	btn.custom_minimum_size = Vector2(100, 100)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.size_flags_vertical   = Control.SIZE_SHRINK_CENTER
 	btn.text = str(value)
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.add_theme_font_size_override("font_size", 30)
@@ -324,11 +326,7 @@ func _update_chip_selection() -> void:
 	for i in range(Constants.CHIP_DENOMINATIONS.size()):
 		var btn := _chip_btns[i]
 		var v := Constants.CHIP_DENOMINATIONS[i]
-		btn.modulate = Color.WHITE if v == selected else Color(1,1,1,0.55)
-		if v == selected:
-			btn.scale = Vector2(1.15, 1.15)
-		else:
-			btn.scale = Vector2(1.0, 1.0)
+		btn.modulate = Color.WHITE if v == selected else Color(1, 1, 1, 0.5)
 
 # ── CLEAR + SPIN buttons ──────────────────────────────────────────────────────
 func _build_action_buttons() -> Control:
