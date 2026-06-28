@@ -33,13 +33,16 @@ static func _make_zones() -> Array:
 	# Zero
 	Z.append(["straight_0", 6.0, 40.9, 5.0, 33.0, [0], 35])
 
-	# Column bets (right side) — keys col1/col2/col3 matching CardManager
+	# Column bets (right side) — keys must match CardManager: col1=%3==1, col2=%3==2, col3=%3==0
+	# rC[0]=top row (3,6,9,...,36 = %3==0) → col3
+	# rC[1]=mid row (2,5,8,...,35 = %3==2) → col2
+	# rC[2]=bot row (1,4,7,...,34 = %3==1) → col1
 	var col_nums := [
-		[3,6,9,12,15,18,21,24,27,30,33,36],  # col1: top row (row 0)
-		[2,5,8,11,14,17,20,23,26,29,32,35],  # col2: middle row
-		[1,4,7,10,13,16,19,22,25,28,31,34],  # col3: bottom row
+		[3,6,9,12,15,18,21,24,27,30,33,36],  # top row → col3
+		[2,5,8,11,14,17,20,23,26,29,32,35],  # mid row → col2
+		[1,4,7,10,13,16,19,22,25,28,31,34],  # bot row → col1
 	]
-	var col_keys := ["col1", "col2", "col3"]
+	var col_keys := ["col3", "col2", "col1"]
 	for r in range(3):
 		Z.append([col_keys[r], 92.4, rC[r], 6.0, 10.6, col_nums[r], 2])
 

@@ -97,6 +97,8 @@ func on_spin_complete(won: bool) -> void:
 		perpetual_counter = 0
 	if has_card("pocket_lint"):
 		add_chips(1)
+	if has_card("croupiers_tip"):
+		add_chips(25)
 
 	# Advance hand; when all hands done, ante up
 	hand += 1

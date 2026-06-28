@@ -616,6 +616,24 @@ func _on_spin_pressed() -> void:
 	_clear_btn.disabled = true
 
 	var number := randi() % 37
+
+	# pocket_blocker: if 0 lands, redirect to an adjacent pocket
+	if number == 0 and GameManager.has_card("pocket_blocker"):
+		var seq := Constants.WHEEL_SEQUENCE
+		var idx := seq.find(0)
+		var size := seq.size()
+		number = seq[idx + (1 if randi() % 2 == 0 else -1 + size) % size]
+
+	# triple_ball: spin 3 balls; CardManager picks best payout automatically
+	GameManager.triple_ball_numbers.clear()
+	if GameManager.has_card("triple_ball"):
+		var extras: Array[int] = [number]
+		while extras.size() < 3:
+			var n := randi() % 37
+			if n not in extras:
+				extras.append(n)
+		GameManager.triple_ball_numbers.assign(extras)
+
 	_open_spin_overlay(number, staked)
 
 func _open_spin_overlay(number: int, staked: int) -> void:
