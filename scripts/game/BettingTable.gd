@@ -10,9 +10,9 @@ var _chip_labels: Dictionary = {}
 var _chip_sprites: Dictionary = {}
 var _win_glows: Dictionary = {}
 
-# Table display dimensions (natural aspect ratio of the betting layout image)
-const TABLE_W := 1040.0
-const TABLE_H := 575.0
+# Table display dimensions — must match actual bet_layout.png (1080×600)
+const TABLE_W := 1080.0
+const TABLE_H := 600.0
 
 # All zones: [key, cx%, cy%, w%, h%, numbers, odds]
 # cx/cy are zone CENTERS as % of table image (same as prototype makeZones())
@@ -76,18 +76,18 @@ static func _make_zones() -> Array:
 var _zones: Array = []
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(1080, TABLE_H + 10)
+	custom_minimum_size = Vector2(1080, TABLE_H)
 	_zones = _make_zones()
 	_build()
 
 func _build() -> void:
-	# Table image background
-	var margin := (1080.0 - TABLE_W) / 2.0
+	# Table image background — image is 1080×600, fills full width with no margin
+	var margin := 0.0
 	var table_img := TextureRect.new()
 	if ResourceLoader.exists("res://assets/layout/bet_layout.png"):
 		table_img.texture = load("res://assets/layout/bet_layout.png")
 	table_img.stretch_mode = TextureRect.STRETCH_SCALE
-	table_img.position = Vector2(margin, 5)
+	table_img.position = Vector2(0, 0)
 	table_img.size = Vector2(TABLE_W, TABLE_H)
 	table_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(table_img)
@@ -160,7 +160,7 @@ func _zone_pos(zone: Array, margin: float) -> Vector2:
 	var w: float  = zone[3]; var h: float  = zone[4]
 	return Vector2(
 		margin + (cx / 100.0) * TABLE_W - (w / 100.0) * TABLE_W / 2.0,
-		5.0    + (cy / 100.0) * TABLE_H - (h / 100.0) * TABLE_H / 2.0
+		(cy / 100.0) * TABLE_H - (h / 100.0) * TABLE_H / 2.0
 	)
 
 func _zone_size(zone: Array) -> Vector2:
