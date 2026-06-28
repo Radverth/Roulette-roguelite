@@ -68,7 +68,7 @@ func _build_ui() -> void:
 	root.add_child(stats)
 
 	_stat_row(stats, "Final Chips", str(GameManager.chips))
-	_stat_row(stats, "Floor Reached", str(GameManager.floor_number))
+	_stat_row(stats, "Ante Reached", Constants.rom(GameManager.ante))
 	_stat_row(stats, "Total Spins", str(GameManager.spin_count))
 	_stat_row(stats, "Cards Owned", str(GameManager.owned_cards.size()))
 

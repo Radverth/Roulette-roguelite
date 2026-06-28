@@ -35,7 +35,7 @@ func _build_ui() -> void:
 	center.add_child(ante_lbl)
 
 	var floor_lbl := Label.new()
-	floor_lbl.text = "Floor %d Complete" % GameManager.floor_number
+	floor_lbl.text = "Ante %s Complete" % Constants.rom(GameManager.ante - 1)
 	floor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	floor_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	floor_lbl.add_theme_font_size_override("font_size", 42)

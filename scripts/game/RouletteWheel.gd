@@ -21,7 +21,7 @@ var _target_number := 0
 var _wheel_angle := 0.0
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(1080, 600)
+	custom_minimum_size = Vector2(1080, 640)
 	_build()
 
 func _build() -> void:
@@ -31,7 +31,7 @@ func _build() -> void:
 	add_child(bg)
 
 	var cx := 540.0
-	var cy := 300.0
+	var cy := 320.0
 	var half := WHEEL_DIAMETER / 2.0
 
 	wheel_base = _make_tex("res://assets/wheel/wheel_base.png", cx - half, cy - half, WHEEL_DIAMETER, WHEEL_DIAMETER)
@@ -117,7 +117,7 @@ func _rotate_wheel(angle: float) -> void:
 
 func _orbit_ball(arc: float) -> void:
 	var cx := 540.0
-	var cy := 300.0
+	var cy := 320.0
 	ball.position = Vector2(
 		cx + BALL_ORBIT_RADIUS * cos(arc) - 24.0,
 		cy + BALL_ORBIT_RADIUS * sin(arc) - 24.0
@@ -126,7 +126,7 @@ func _orbit_ball(arc: float) -> void:
 func _land_ball() -> void:
 	var pocket_angle := _pocket_world_angle(_target_number)
 	var cx := 540.0
-	var cy := 300.0
+	var cy := 320.0
 	var target_pos := Vector2(
 		cx + BALL_LAND_RADIUS * cos(pocket_angle) - 24.0,
 		cy + BALL_LAND_RADIUS * sin(pocket_angle) - 24.0
@@ -139,7 +139,7 @@ func _show_result() -> void:
 	_is_spinning = false
 	var pocket_angle := _pocket_world_angle(_target_number)
 	var cx := 540.0
-	var cy := 300.0
+	var cy := 320.0
 	pocket_highlight.position = Vector2(
 		cx + BALL_LAND_RADIUS * cos(pocket_angle) - 64.0,
 		cy + BALL_LAND_RADIUS * sin(pocket_angle) - 32.0
