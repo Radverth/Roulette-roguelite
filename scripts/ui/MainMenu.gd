@@ -19,27 +19,22 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	# Gradient overlay — bottom ~62% fades to near-black
+	# Dark overlay (full screen)
 	var overlay := ColorRect.new()
-	overlay.color = Color(0.02, 0.0, 0.0, 0.96)
-	overlay.anchor_left   = 0.0
-	overlay.anchor_top    = 0.38
-	overlay.anchor_right  = 1.0
-	overlay.anchor_bottom = 1.0
+	overlay.color = Color(0.02, 0.0, 0.0, 0.86)
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay)
 
-	# ── Title block — top area ────────────────────────────────────────────────
-	var title_block := VBoxContainer.new()
-	title_block.anchor_left   = 0.0
-	title_block.anchor_top    = 0.0
-	title_block.anchor_right  = 1.0
-	title_block.anchor_bottom = 0.0
-	title_block.offset_top    = 100.0
-	title_block.offset_bottom = 360.0
-	title_block.alignment = BoxContainer.ALIGNMENT_CENTER
-	title_block.add_theme_constant_override("separation", 10)
-	add_child(title_block)
+	# Single VBox — title at top, expanding spacer in middle, buttons at bottom
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left   = 60.0
+	vbox.offset_right  = -60.0
+	vbox.offset_top    = 80.0
+	vbox.offset_bottom = -80.0
+	vbox.add_theme_constant_override("separation", 20)
+	add_child(vbox)
 
 	# Devil icon
 	var devil_icon := TextureRect.new()
@@ -49,7 +44,7 @@ func _build_ui() -> void:
 	devil_icon.custom_minimum_size = Vector2(116, 116)
 	devil_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	devil_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_block.add_child(devil_icon)
+	vbox.add_child(devil_icon)
 
 	# VELVET SPIN
 	var title := Label.new()
@@ -58,7 +53,7 @@ func _build_ui() -> void:
 	title.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	title.add_theme_font_size_override("font_size", 88)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_block.add_child(title)
+	vbox.add_child(title)
 
 	# Infernal Roulette subtitle
 	var subtitle := Label.new()
@@ -67,33 +62,25 @@ func _build_ui() -> void:
 	subtitle.add_theme_color_override("font_color", Color(Constants.COLOR_TEXT.r, Constants.COLOR_TEXT.g, Constants.COLOR_TEXT.b, 0.82))
 	subtitle.add_theme_font_size_override("font_size", 32)
 	subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_block.add_child(subtitle)
+	vbox.add_child(subtitle)
 
-	# ── Buttons block — bottom area ───────────────────────────────────────────
-	var btn_block := VBoxContainer.new()
-	btn_block.anchor_left   = 0.0
-	btn_block.anchor_top    = 1.0
-	btn_block.anchor_right  = 1.0
-	btn_block.anchor_bottom = 1.0
-	btn_block.offset_top    = -440.0
-	btn_block.offset_bottom = -100.0
-	btn_block.offset_left   = 60.0
-	btn_block.offset_right  = -60.0
-	btn_block.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_block.add_theme_constant_override("separation", 22)
-	add_child(btn_block)
+	# Expanding spacer — pushes buttons to bottom while showing background art
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(spacer)
 
 	var enter_btn := _make_btn("ENTER THE PARLOUR")
 	enter_btn.pressed.connect(_on_new_game)
-	btn_block.add_child(enter_btn)
+	vbox.add_child(enter_btn)
 
 	var shop_btn := _make_btn("THE VELVET SHOP")
 	shop_btn.pressed.connect(_on_velvet_shop)
-	btn_block.add_child(shop_btn)
+	vbox.add_child(shop_btn)
 
 	var howto_btn := _make_btn("HOW TO PLAY")
 	howto_btn.pressed.connect(_on_how_to_play)
-	btn_block.add_child(howto_btn)
+	vbox.add_child(howto_btn)
 
 	# Version text
 	var ver_lbl := Label.new()
@@ -103,7 +90,7 @@ func _build_ui() -> void:
 	ver_lbl.add_theme_color_override("font_color", Color(Constants.COLOR_TEXT.r, Constants.COLOR_TEXT.g, Constants.COLOR_TEXT.b, 0.5))
 	ver_lbl.add_theme_font_size_override("font_size", 22)
 	ver_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn_block.add_child(ver_lbl)
+	vbox.add_child(ver_lbl)
 
 func _make_btn(text: String) -> Button:
 	var btn := Button.new()
