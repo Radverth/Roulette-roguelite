@@ -3,12 +3,12 @@ extends Control
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
-	_animate_and_continue()
 
 func _build_ui() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0.02, 0.0, 0.0)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	var watermark := TextureRect.new()
@@ -62,13 +62,17 @@ func _build_ui() -> void:
 
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(ante_lbl, "modulate:a", 1.0, 0.7)
-	tween.tween_property(floor_lbl, "modulate:a", 1.0, 0.7).set_delay(0.3)
-	tween.tween_property(div, "modulate:a", 1.0, 0.7).set_delay(0.6)
+	tween.tween_property(ante_lbl,     "modulate:a", 1.0, 0.7)
+	tween.tween_property(floor_lbl,    "modulate:a", 1.0, 0.7).set_delay(0.3)
+	tween.tween_property(div,          "modulate:a", 1.0, 0.7).set_delay(0.6)
 	tween.tween_property(entering_lbl, "modulate:a", 1.0, 0.7).set_delay(0.9)
 
-func _animate_and_continue() -> void:
+	# Devil speaks after labels appear
+	var devil := DevilDialogue.new()
+	add_child(devil)
+	get_tree().create_timer(1.2).timeout.connect(func(): devil.say("floor_complete", 0.0))
+
 	await get_tree().create_timer(2.8).timeout
-	var tween := create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, 0.5)
-	tween.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/Shop.tscn"))
+	var fade := create_tween()
+	fade.tween_property(self, "modulate:a", 0.0, 0.5)
+	fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/Shop.tscn"))

@@ -4,6 +4,9 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	GameManager.game_active = false
+	var devil := DevilDialogue.new()
+	add_child(devil)
+	get_tree().create_timer(0.8).timeout.connect(func(): devil.say("game_over", 5.0))
 
 func _build_ui() -> void:
 	var bg := ColorRect.new()
