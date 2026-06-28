@@ -5,7 +5,7 @@
 [application]
 
 config/name="Velvet Spin"
-config/version="1.0.5"
+config/version="1.0.6"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.3", "Mobile")
 config/icon="res://assets/effects/icon_1024.png"
