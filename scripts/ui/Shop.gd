@@ -6,6 +6,9 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_offer = CardManager.get_shop_offer(3)
 	_build_ui()
+	var devil := DevilDialogue.new()
+	add_child(devil)
+	get_tree().create_timer(0.6).timeout.connect(func(): devil.say("shop", 4.0))
 
 func _build_ui() -> void:
 	var bg := TextureRect.new()
@@ -238,7 +241,7 @@ func _on_continue() -> void:
 		GameManager.owned_cards.clear()
 		GameManager.emit_signal("cards_changed")
 	GameManager.advance_floor()
-	get_tree().change_scene_to_file("res://scenes/FloorTransition.tscn")
+	get_tree().change_scene_to_file("res://scenes/Game.tscn")
 
 func _make_btn(text: String, color: Color) -> Button:
 	var btn := Button.new()
