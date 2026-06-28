@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://boss_reveal"]
+
+[ext_resource type="Script" path="res://scripts/ui/BossReveal.gd" id="1_bossreveal"]
+
+[node name="BossReveal" type="Control"]
+script = ExtResource("1_bossreveal")

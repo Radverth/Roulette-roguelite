@@ -52,8 +52,11 @@ func _build_ui() -> void:
 	div.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(div)
 
+	# Determine next destination label
+	var is_boss := (GameManager.ante % 3 == 0)
+	var next_text := "Entering the Boss Blind..." if is_boss else "Entering the Velvet Shop..."
 	var entering_lbl := Label.new()
-	entering_lbl.text = "Entering the Velvet Shop..."
+	entering_lbl.text = next_text
 	entering_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	entering_lbl.add_theme_color_override("font_color", Color(0.7, 0.6, 0.5))
 	entering_lbl.add_theme_font_size_override("font_size", 30)
@@ -67,7 +70,6 @@ func _build_ui() -> void:
 	tween.tween_property(div,          "modulate:a", 1.0, 0.7).set_delay(0.6)
 	tween.tween_property(entering_lbl, "modulate:a", 1.0, 0.7).set_delay(0.9)
 
-	# Devil speaks after labels appear
 	var devil := DevilDialogue.new()
 	add_child(devil)
 	get_tree().create_timer(1.2).timeout.connect(func(): devil.say("floor_complete", 0.0))
@@ -75,4 +77,18 @@ func _build_ui() -> void:
 	await get_tree().create_timer(2.8).timeout
 	var fade := create_tween()
 	fade.tween_property(self, "modulate:a", 0.0, 0.5)
-	fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/Shop.tscn"))
+
+	if is_boss:
+		# Set up boss modifier for this ante
+		var idx := (GameManager.ante - 1) % Constants.BOSS_MODIFIERS.size()
+		GameManager.is_boss_floor = true
+		GameManager.current_boss_modifier = Constants.BOSS_MODIFIERS[idx]
+		fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/BossReveal.tscn"))
+	else:
+		GameManager.is_boss_floor = false
+		GameManager.current_boss_modifier = {}
+		# Show joker hand review if player has cards, otherwise go straight to shop
+		if not GameManager.owned_cards.is_empty():
+			fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/JokerHand.tscn"))
+		else:
+			fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/Shop.tscn"))
