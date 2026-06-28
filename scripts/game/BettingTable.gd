@@ -15,11 +15,11 @@ const MARGIN_Y    := 10.0
 const ZERO_W      := 65.0
 const COL_SIDE    := 45.0
 const COL_W_NUM   := 79.0
-const ROW_H_NUM   := 216.0   # 3 rows × 216 = 648
-const ROW_H_OUT   := 136.0   # 2 rows × 136 = 272; total = 648+272+20 = 940
+const ROW_H_NUM   := 200.0   # 3 rows × 200 = 600
+const ROW_H_OUT   := 140.0   # 2 rows × 140 = 280; total = 600+280+20 = 900
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(1080, 940)
+	custom_minimum_size = Vector2(1080, 900)
 	_build()
 
 func _build() -> void:
@@ -28,15 +28,6 @@ func _build() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
-
-	var layout_bg := TextureRect.new()
-	if ResourceLoader.exists("res://assets/layout/bet_layout.png"):
-		layout_bg.texture = load("res://assets/layout/bet_layout.png")
-	layout_bg.stretch_mode = TextureRect.STRETCH_SCALE
-	layout_bg.position = Vector2(MARGIN_X, MARGIN_Y)
-	layout_bg.size = Vector2(1080.0 - MARGIN_X * 2.0, 940.0 - MARGIN_Y * 2.0)
-	layout_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(layout_bg)
 
 	# Zero pocket
 	_add_zone("straight_0", "0", MARGIN_X, MARGIN_Y, ZERO_W, ROW_H_NUM * 3.0, _number_color(0))
@@ -90,8 +81,8 @@ func _add_zone(key: String, label_text: String, x: float, y: float, w: float, h:
 	# Normal style
 	var style_n := StyleBoxFlat.new()
 	style_n.bg_color = col
-	style_n.border_color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.55)
-	style_n.set_border_width_all(1)
+	style_n.border_color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.7)
+	style_n.set_border_width_all(2)
 	style_n.set_corner_radius_all(2)
 	btn.add_theme_stylebox_override("normal", style_n)
 
@@ -131,7 +122,7 @@ func _add_zone(key: String, label_text: String, x: float, y: float, w: float, h:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
-	var font_size := 22 if h >= ROW_H_NUM * 0.9 else 18
+	var font_size := 26 if h >= ROW_H_NUM * 0.9 else 20
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(lbl)
@@ -141,9 +132,9 @@ func _add_zone(key: String, label_text: String, x: float, y: float, w: float, h:
 	if ResourceLoader.exists("res://assets/layout/chip_default.png"):
 		chip.texture = load("res://assets/layout/chip_default.png")
 	chip.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var chip_size := min(min(w * 0.45, h * 0.45), 56.0)
+	var chip_size := min(w * 0.62, 70.0)
 	chip.size = Vector2(chip_size, chip_size)
-	chip.position = Vector2((w - chip_size) / 2.0, (h - chip_size) / 2.0 + 8.0)
+	chip.position = Vector2((w - chip_size) / 2.0, (h - chip_size) / 2.0)
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.hide()
 	btn.add_child(chip)
@@ -156,8 +147,8 @@ func _add_zone(key: String, label_text: String, x: float, y: float, w: float, h:
 	bet_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bet_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
 	bet_lbl.offset_bottom = -4.0
-	bet_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
-	bet_lbl.add_theme_font_size_override("font_size", 18)
+	bet_lbl.add_theme_color_override("font_color", Color.WHITE)
+	bet_lbl.add_theme_font_size_override("font_size", 22)
 	bet_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bet_lbl.hide()
 	btn.add_child(bet_lbl)

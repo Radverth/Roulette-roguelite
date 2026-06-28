@@ -29,9 +29,9 @@ func _ready() -> void:
 
 # ── Layout (sums to exactly 1920px) ────────────────────────────────────────
 # HUD          150 px
-# RouletteWheel 600 px
+# RouletteWheel 640 px
 # Flame divider  30 px
-# BettingTable  940 px
+# BettingTable  900 px
 # Controls      200 px
 # Total:       1920 px
 func _build_ui() -> void:
