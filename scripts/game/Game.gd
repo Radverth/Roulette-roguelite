@@ -392,18 +392,39 @@ func _build_spin_overlay() -> void:
 	var wx := _WCX - _WSZ / 2.0  # = 170
 	var wy := _WCY - _WSZ / 2.0  # = 100
 
-	# Wheel base (ROTATES) — single layer, already contains sectors + numbers + star ring
+	# Clip container — confines the rotating wheel to its frame rect so it
+	# never bleeds outside the wheel_rim circular boundary.
+	var wheel_clip := Control.new()
+	wheel_clip.position      = Vector2(wx, wy)
+	wheel_clip.size          = Vector2(_WSZ, _WSZ)
+	wheel_clip.clip_contents = true
+	wheel_clip.mouse_filter  = Control.MOUSE_FILTER_IGNORE
+	_spin_overlay.add_child(wheel_clip)
+
+	# Wheel base (ROTATES) — inner sectors; parent is wheel_clip
 	_wheel_img = TextureRect.new()
 	if ResourceLoader.exists("res://assets/wheel/wheel_base.png"):
 		_wheel_img.texture = load("res://assets/wheel/wheel_base.png")
 	_wheel_img.stretch_mode = TextureRect.STRETCH_SCALE
-	_wheel_img.position     = Vector2(wx, wy)
+	_wheel_img.position     = Vector2.ZERO
 	_wheel_img.size         = Vector2(_WSZ, _WSZ)
 	_wheel_img.pivot_offset = Vector2(_WSZ / 2.0, _WSZ / 2.0)
 	_wheel_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_spin_overlay.add_child(_wheel_img)
+	wheel_clip.add_child(_wheel_img)
 
-	# Rim overlay (STATIC) — same size/position, transparent center, covers rotating star ring
+	# Numbers ring (ROTATES with wheel) — rendered on top of sectors inside clip
+	if ResourceLoader.exists("res://assets/wheel/wheel_numbers.png"):
+		var nums := TextureRect.new()
+		nums.texture        = load("res://assets/wheel/wheel_numbers.png")
+		nums.stretch_mode   = TextureRect.STRETCH_SCALE
+		nums.position       = Vector2.ZERO
+		nums.size           = Vector2(_WSZ, _WSZ)
+		nums.pivot_offset   = Vector2(_WSZ / 2.0, _WSZ / 2.0)
+		nums.mouse_filter   = Control.MOUSE_FILTER_IGNORE
+		wheel_clip.add_child(nums)
+		nums.name = "WheelNumbers"
+
+	# Rim overlay (STATIC) — sibling of clip, renders on top as the frame
 	var rim := TextureRect.new()
 	if ResourceLoader.exists("res://assets/wheel/wheel_rim.png"):
 		rim.texture = load("res://assets/wheel/wheel_rim.png")
@@ -678,6 +699,9 @@ func _open_spin_overlay(number: int, staked: int) -> void:
 
 func _rotate_wheel(angle: float) -> void:
 	_wheel_img.rotation = angle
+	var nums := _wheel_img.get_parent().get_node_or_null("WheelNumbers") as TextureRect
+	if nums:
+		nums.rotation = angle
 
 func _orbit_ball(arc: float) -> void:
 	_ball_img.position = Vector2(
