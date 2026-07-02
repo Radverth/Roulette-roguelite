@@ -74,9 +74,9 @@ func _build_ui() -> void:
 	enter_btn.pressed.connect(_on_new_game)
 	vbox.add_child(enter_btn)
 
-	var shop_btn := _make_btn("THE VELVET SHOP")
-	shop_btn.pressed.connect(_on_velvet_shop)
-	vbox.add_child(shop_btn)
+	var scores_btn := _make_btn("HALL OF INFAMY")
+	scores_btn.pressed.connect(_on_hall_of_infamy)
+	vbox.add_child(scores_btn)
 
 	var howto_btn := _make_btn("HOW TO PLAY")
 	howto_btn.pressed.connect(_on_how_to_play)
@@ -118,10 +118,39 @@ func _on_new_game() -> void:
 	GameManager.start_new_game()
 	get_tree().change_scene_to_file("res://scenes/Game.tscn")
 
-func _on_velvet_shop() -> void:
+func _on_hall_of_infamy() -> void:
 	AudioManager.play_ui_click()
-	# Show the shop as a preview (without starting game state)
-	get_tree().change_scene_to_file("res://scenes/Shop.tscn")
+	var dialog := AcceptDialog.new()
+	dialog.title = "Hall of Infamy"
+	dialog.size = Vector2(800, 900)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	dialog.add_child(vbox)
+
+	var scores := SaveManager.get_high_scores()
+	if scores.is_empty():
+		var lbl := Label.new()
+		lbl.text = "No souls claimed yet.\nThe House awaits your first offering."
+		lbl.add_theme_font_size_override("font_size", 28)
+		vbox.add_child(lbl)
+	else:
+		for i in range(scores.size()):
+			var entry: Dictionary = scores[i]
+			var lbl := Label.new()
+			lbl.text = "%d.  Ante %s  ·  %d chips  ·  %s" % [
+				i + 1,
+				Constants.rom(int(entry.get("floor", 1))),
+				int(entry.get("chips", 0)),
+				str(entry.get("date", "")),
+			]
+			lbl.add_theme_font_size_override("font_size", 26)
+			vbox.add_child(lbl)
+
+	add_child(dialog)
+	dialog.popup_centered()
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
 
 func _on_how_to_play() -> void:
 	AudioManager.play_ui_click()

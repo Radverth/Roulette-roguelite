@@ -73,7 +73,7 @@ const CARDS: Array[Dictionary] = [
 	},
 	{
 		"id": "velvet_hand", "name": "Velvet Hand", "rarity": "legendary",
-		"desc": "Keep all your cards when advancing to the next floor.",
+		"desc": "Deep pockets — holds 2 extra Jokers.",
 		"icon": "res://assets/cards/icon_velvet_hand.png",
 	},
 	{
@@ -109,13 +109,25 @@ func calculate_winnings(bets: Dictionary, winning_number: int) -> int:
 		numbers_to_check = GameManager.triple_ball_numbers
 
 	var best_return := 0
+	var best_number := winning_number
 	for n in numbers_to_check:
 		var r := _base_return(bets, n)
-		best_return = max(best_return, r)
+		if r > best_return:
+			best_return = r
+			best_number = n
 
-	best_return = _apply_card_bonuses(bets, winning_number, best_return)
-	best_return = _apply_boss_modifier(winning_number, best_return, _total_bet(bets))
+	# Boss: THE CROUPIER — red numbers pay nothing for the whole ante.
+	# Applied before card bonuses so loss-protection cards can still respond.
+	if _boss_id() == "red_pays_nothing" and best_number in Constants.RED_NUMBERS:
+		best_return = 0
+
+	best_return = _apply_card_bonuses(bets, best_number, best_return)
 	return best_return
+
+func _boss_id() -> String:
+	if not GameManager.is_boss_floor:
+		return ""
+	return GameManager.current_boss_modifier.get("id", "")
 
 func _total_bet(bets: Dictionary) -> int:
 	var total := 0
@@ -133,13 +145,16 @@ func _base_return(bets: Dictionary, number: int) -> int:
 	return total
 
 func _payout_ratio(bet_key: String, number: int) -> int:
-	if GameManager.is_boss_floor and GameManager.current_boss_modifier.get("id") == "no_outside":
-		if not bet_key.begins_with("straight_"):
-			return 0
-
 	if bet_key.begins_with("straight_"):
 		var n := int(bet_key.trim_prefix("straight_"))
 		return Constants.PAYOUT_STRAIGHT if n == number else 0
+
+	# Boss: THE MIRROR — Odd and Even swap their payouts until the ante is cleared.
+	if _boss_id() == "odds_swap":
+		if bet_key == "odd":
+			bet_key = "even"
+		elif bet_key == "even":
+			bet_key = "odd"
 
 	match bet_key:
 		"red":
@@ -172,11 +187,20 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 	var total_bet := _total_bet(bets)
 	var result := base
 
-	# Zero special handling
+	# Zero special handling — never worse than the base return (e.g. a straight-up 0 win)
 	if number == 0:
 		if GameManager.has_card("house_edge_reversal") or GameManager.has_card("zero_bounty"):
-			return total_bet + 100
-		return result
+			result = max(result, total_bet + 100)
+
+	# Magnetic Sector pays on straight bets adjacent to the winning pocket,
+	# even when nothing else hit — so it runs before loss handling.
+	if GameManager.has_card("magnetic_sector"):
+		var adj := _adjacent_numbers(number)
+		for bet_key in bets:
+			if bet_key.begins_with("straight_"):
+				var n := int(bet_key.trim_prefix("straight_"))
+				if n in adj:
+					result += int(bets[bet_key]) * 5
 
 	# Loss handling
 	if result == 0:
@@ -207,27 +231,6 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 	if GameManager.has_card("streak_counter"):
 		result = int(result * GameManager.get_streak_multiplier())
 
-	if GameManager.has_card("magnetic_sector"):
-		var adj := _adjacent_numbers(number)
-		for bet_key in bets:
-			if bet_key.begins_with("straight_"):
-				var n := int(bet_key.trim_prefix("straight_"))
-				if n in adj:
-					result += int(bets[bet_key]) * 5
-
-	return result
-
-func _apply_boss_modifier(number: int, result: int, total_bet: int) -> int:
-	if not GameManager.is_boss_floor:
-		return result
-	match GameManager.current_boss_modifier.get("id", ""):
-		"half_payout":
-			return result / 2
-		"jackpot_zero":
-			if number == 0:
-				return total_bet * 3 + 300
-		"double_zero":
-			pass
 	return result
 
 func _adjacent_numbers(number: int) -> Array[int]:

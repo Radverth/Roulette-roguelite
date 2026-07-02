@@ -27,10 +27,10 @@ const PAYOUT_DOZEN       := 2
 const PAYOUT_EVEN_CHANCE := 1
 
 const CARD_PRICES := {
-	"common":    4,
-	"uncommon":  6,
-	"rare":      9,
-	"legendary": 14,
+	"common":    40,
+	"uncommon":  60,
+	"rare":      90,
+	"legendary": 140,
 }
 
 const CARD_RARITY_COLORS := {

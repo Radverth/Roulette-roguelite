@@ -36,7 +36,7 @@ func _build_ui() -> void:
 
 	# "{count} / 5 — bound to your fate"
 	var count_lbl := Label.new()
-	count_lbl.text = "%d / %d — bound to your fate" % [GameManager.owned_cards.size(), Constants.MAX_OWNED_CARDS]
+	count_lbl.text = "%d / %d — bound to your fate" % [GameManager.owned_cards.size(), GameManager.get_max_cards()]
 	count_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	count_lbl.add_theme_color_override("font_color", Color(Constants.COLOR_TEXT.r, Constants.COLOR_TEXT.g, Constants.COLOR_TEXT.b, 0.85))
 	count_lbl.add_theme_font_size_override("font_size", 28)
@@ -65,7 +65,7 @@ func _build_ui() -> void:
 	grid.add_theme_constant_override("v_separation", 28)
 	grid_wrap.add_child(grid)
 
-	var max_slots := Constants.MAX_OWNED_CARDS
+	var max_slots := GameManager.get_max_cards()
 	for i in range(max_slots):
 		if i < GameManager.owned_cards.size():
 			grid.add_child(_build_filled_card(GameManager.owned_cards[i]))

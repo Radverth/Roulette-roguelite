@@ -58,7 +58,10 @@ func _build_ui() -> void:
 
 	# Subtitle
 	var subtitle := Label.new()
-	subtitle.text = "The House has taken everything.\nYour seat at the table grows cold."
+	if GameManager.run_failed:
+		subtitle.text = "The House demanded %d chips. You fell short.\nYour seat at the table grows cold." % GameManager.target
+	else:
+		subtitle.text = "The House has taken everything.\nYour seat at the table grows cold."
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	subtitle.add_theme_font_size_override("font_size", 28)
@@ -73,14 +76,16 @@ func _build_ui() -> void:
 	root.add_child(stats_row)
 
 	_add_stat_col(stats_row, "REACHED", "Ante %s" % Constants.rom(GameManager.ante))
-
-	var divider := ColorRect.new()
-	divider.color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.3)
-	divider.custom_minimum_size = Vector2(2, 60)
-	divider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	stats_row.add_child(divider)
-
+	stats_row.add_child(_make_stat_divider())
 	_add_stat_col(stats_row, "JOKERS", str(GameManager.owned_cards.size()))
+
+	# Personal best from saved runs
+	var best_floor := 0
+	for entry in SaveManager.get_high_scores():
+		best_floor = maxi(best_floor, int(entry.get("floor", 0)))
+	if best_floor > 0:
+		stats_row.add_child(_make_stat_divider())
+		_add_stat_col(stats_row, "BEST", "Ante %s" % Constants.rom(best_floor))
 
 	# Spacer
 	var spacer := Control.new()
@@ -96,6 +101,13 @@ func _build_ui() -> void:
 	var menu_btn := _make_border_btn("EXIT TO MAIN MENU", 420, 86)
 	menu_btn.pressed.connect(_on_main_menu)
 	root.add_child(menu_btn)
+
+func _make_stat_divider() -> ColorRect:
+	var divider := ColorRect.new()
+	divider.color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.3)
+	divider.custom_minimum_size = Vector2(2, 60)
+	divider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return divider
 
 func _add_stat_col(parent: HBoxContainer, label_text: String, value_text: String) -> void:
 	var col := VBoxContainer.new()

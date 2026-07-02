@@ -2,6 +2,7 @@ class_name BettingTable
 extends Control
 
 signal bet_placed(key: String, amount: int)
+signal bet_rejected()
 signal bets_cleared()
 
 var bets: Dictionary = {}
@@ -51,12 +52,16 @@ static func _make_zones() -> Array:
 	var dcx := [22.6, 49.1, 75.6]
 	var dozen_keys := ["dozen1", "dozen2", "dozen3"]
 	for i in range(3):
-		var ns := []; for k in range(dozen_ranges[i][0], dozen_ranges[i][1]+1): ns.append(k)
+		var ns := []
+		for k in range(dozen_ranges[i][0], dozen_ranges[i][1] + 1):
+			ns.append(k)
 		Z.append([dozen_keys[i], dcx[i], 63.4, 25.0, 9.0, ns, 2])
 
 	# Even-chance bets (keys match CardManager: low, red, black, even, odd, high)
 	var red_set := Constants.RED_NUMBERS
-	var all := []; for k in range(1,37): all.append(k)
+	var all := []
+	for k in range(1, 37):
+		all.append(k)
 	var low  := all.filter(func(n): return n <= 18)
 	var high := all.filter(func(n): return n >= 19)
 	var reds  := all.filter(func(n): return n in red_set)
@@ -168,6 +173,10 @@ func _zone_size(zone: Array) -> Vector2:
 	return Vector2((w / 100.0) * TABLE_W, (h / 100.0) * TABLE_H)
 
 func _on_zone_pressed(key: String) -> void:
+	# Never let the total stake exceed the player's chips
+	if get_total_bet() + _chip_amount > GameManager.chips:
+		emit_signal("bet_rejected")
+		return
 	if AudioManager.has_method("play_chip"):
 		AudioManager.play_chip()
 	bets[key] = bets.get(key, 0) + _chip_amount

@@ -46,6 +46,11 @@ const PUSH_LINES := [
 	"A push. The wheel toys with you before it feasts.",
 	"Even fate hesitates tonight. Do not mistake it for mercy.",
 ]
+const ZERO_LINES := [
+	"ZERO! That is MY pocket, mortal. How generous of you to visit.",
+	"The green void claims all. Even my appetite has limits… almost.",
+	"The house's favourite number. Mine too. What a coincidence.",
+]
 
 # ── Layout heights (sum = 1920px) ────────────────────────────────────────────
 const H_ANTE   := 130  # "Ante I" top bar
@@ -57,7 +62,6 @@ const H_TABLE  := 600  # betting table (1080 × 600 image, full width)
 const H_MSG    := 90   # message row
 const H_CHIPS  := 140  # chip selector
 const H_BTNS   := 280  # CLEAR + SPIN
-const H_PAD    := 350  # bottom padding
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -547,6 +551,7 @@ func _connect_signals() -> void:
 	_spin_btn.pressed.connect(_on_spin_pressed)
 	_clear_btn.pressed.connect(_on_clear_pressed)
 	_table.bet_placed.connect(_on_bet_placed)
+	_table.bet_rejected.connect(_on_bet_rejected)
 	GameManager.chips_changed.connect(_on_chips_changed)
 	GameManager.hand_changed.connect(_on_hand_changed)
 	GameManager.ante_changed.connect(_on_ante_changed)
@@ -607,6 +612,9 @@ func _on_bet_placed(_key: String, _amount: int) -> void:
 	_staked_lbl.text = "STAKED %s" % _fmt(total)
 	_msg_lbl.text = "Wager placed — spin when ready"
 
+func _on_bet_rejected() -> void:
+	_msg_lbl.text = "Not enough chips for that wager"
+
 # ── Chip selection ─────────────────────────────────────────────────────────────
 func _on_chip_selected(value: int) -> void:
 	_table.set_chip_amount(value)
@@ -641,7 +649,8 @@ func _on_spin_pressed() -> void:
 		var seq := Constants.WHEEL_SEQUENCE
 		var idx := seq.find(0)
 		var size := seq.size()
-		number = seq[idx + (1 if randi() % 2 == 0 else -1 + size) % size]
+		var step := 1 if randi() % 2 == 0 else -1
+		number = seq[(idx + step + size) % size]
 
 	# triple_ball: spin 3 balls; CardManager picks best payout automatically
 	GameManager.triple_ball_numbers.clear()
@@ -748,14 +757,18 @@ func _show_result(number: int, staked: int) -> void:
 		outcome_text = "+%s chips" % _fmt(net)
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 		_trigger_win_burst()
-	elif payout > 0:
+		AudioManager.play_win()
+	elif net == 0:
 		pool = PUSH_LINES
 		outcome_text = "Pushed — %s returned" % _fmt(payout)
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	else:
 		pool = LOSS_LINES
-		outcome_text = "Lost %s chips" % _fmt(staked)
+		outcome_text = "Lost %s chips" % _fmt(-net)
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_CRIMSON)
+		AudioManager.play_loss()
+	if number == 0 and net <= 0:
+		pool = ZERO_LINES
 
 	_dialogue_lbl.text = pool[randi() % pool.size()]
 	_spin_overlay.get_node_or_null("DialogueBox").show()
@@ -769,7 +782,9 @@ func _show_result(number: int, staked: int) -> void:
 
 func _continue_label() -> String:
 	if GameManager.check_game_over():
-		return "RUIN ACCEPTED"
+		return "ACCEPT RUIN"
+	if _pending_ante_up:
+		return "ANTE CLEARED"
 	return "NEXT SPIN"
 
 func _trigger_win_burst() -> void:
@@ -876,4 +891,13 @@ func _action_btn(text: String, is_primary: bool) -> Button:
 	return btn
 
 func _fmt(n: int) -> String:
-	return str(n)
+	var neg := n < 0
+	var s := str(absi(n))
+	var out := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" + out) if neg else out

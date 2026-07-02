@@ -162,8 +162,8 @@ func _build_ui() -> void:
 func _get_boss_modifier() -> Dictionary:
 	if GameManager.is_boss_floor and not GameManager.current_boss_modifier.is_empty():
 		return GameManager.current_boss_modifier
-	# Pick one for this ante
-	var idx := (GameManager.ante - 1) % Constants.BOSS_MODIFIERS.size()
+	# Pick one for this ante — rotate per boss encounter
+	var idx := (maxi(GameManager.ante / 3, 1) - 1) % Constants.BOSS_MODIFIERS.size()
 	var mod: Dictionary = Constants.BOSS_MODIFIERS[idx]
 	GameManager.is_boss_floor = true
 	GameManager.current_boss_modifier = mod

@@ -79,8 +79,9 @@ func _build_ui() -> void:
 	fade.tween_property(self, "modulate:a", 0.0, 0.5)
 
 	if is_boss:
-		# Set up boss modifier for this ante
-		var idx := (GameManager.ante - 1) % Constants.BOSS_MODIFIERS.size()
+		# Set up boss modifier for this ante — rotate per boss encounter
+		# (ante is always a multiple of 3 here, so index by encounter count)
+		var idx := (GameManager.ante / 3 - 1) % Constants.BOSS_MODIFIERS.size()
 		GameManager.is_boss_floor = true
 		GameManager.current_boss_modifier = Constants.BOSS_MODIFIERS[idx]
 		fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/BossReveal.tscn"))
