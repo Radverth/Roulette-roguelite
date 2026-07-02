@@ -12,6 +12,21 @@ const HANDS_PER_ANTE  := 4
 const ANTE_SCALE      := 1.6
 const GAME_OVER_CHIPS := 5
 const MAX_OWNED_CARDS := 5
+const WIN_ANTE        := 8    # clear this ante to beat the House
+
+# Ante-clear bounty: flat payout plus interest on banked chips
+const BOUNTY_FLAT         := 50
+const BOUNTY_INTEREST_DIV := 10   # +1 chip per 10 banked
+const BOUNTY_INTEREST_CAP := 150
+
+const REROLL_BASE_COST := 10  # shop reroll price, escalates per use
+
+const SHOP_RARITY_WEIGHTS := {
+	"common":    50,
+	"uncommon":  30,
+	"rare":      15,
+	"legendary": 5,
+}
 
 const CHIP_DENOMINATIONS: Array[int] = [5, 25, 100]
 const DEFAULT_CHIP := 25

@@ -81,7 +81,49 @@ const CARDS: Array[Dictionary] = [
 		"desc": "Ball on zero refunds all bets and pays 100 chip bonus.",
 		"icon": "res://assets/cards/icon_zero_bounty.png",
 	},
+	{
+		"id": "insurance_policy", "name": "Insurance Policy", "rarity": "common",
+		"desc": "Losses refund 10% of your stake.",
+		"icon": "",
+	},
+	{
+		"id": "lucky_seven", "name": "Lucky Seven", "rarity": "uncommon",
+		"desc": "Wins on 7, 17 or 27 pay double.",
+		"icon": "",
+	},
+	{
+		"id": "devils_due", "name": "Devil's Due", "rarity": "uncommon",
+		"desc": "Gain 2% of your purse after every spin (max 40).",
+		"icon": "",
+	},
+	{
+		"id": "midas_touch", "name": "Midas Touch", "rarity": "rare",
+		"desc": "Straight-up wins pay 50% extra.",
+		"icon": "",
+	},
+	{
+		"id": "cold_streak", "name": "Cold Streak", "rarity": "rare",
+		"desc": "After 3 straight losses, your next win pays triple.",
+		"icon": "",
+	},
+	{
+		"id": "high_roller", "name": "High Roller", "rarity": "rare",
+		"desc": "Winning spins with a stake of 200+ pay 25% extra.",
+		"icon": "",
+	},
+	{
+		"id": "loaded_dice", "name": "Loaded Dice", "rarity": "legendary",
+		"desc": "Once per ante, a total loss refunds your full stake.",
+		"icon": "",
+	},
+	{
+		"id": "silent_partner", "name": "Silent Partner", "rarity": "legendary",
+		"desc": "The House's ante bounty is doubled.",
+		"icon": "",
+	},
 ]
+
+const LUCKY_SEVENS: Array[int] = [7, 17, 27]
 
 func get_card(card_id: String) -> Dictionary:
 	for card in CARDS:
@@ -89,16 +131,42 @@ func get_card(card_id: String) -> Dictionary:
 			return card.duplicate()
 	return {}
 
+# Rarity-weighted shop roll: commons are everyday stock, legendaries are the chase
 func get_shop_offer(count: int = 3) -> Array[Dictionary]:
-	var pool: Array[Dictionary] = []
+	var buckets := {}
+	for rarity in Constants.SHOP_RARITY_WEIGHTS:
+		buckets[rarity] = []
 	for card in CARDS:
-		if not GameManager.has_card(card.id):
-			pool.append(card.duplicate())
-	pool.shuffle()
+		if GameManager.has_card(card.id):
+			continue
+		var rarity: String = card.get("rarity", "common")
+		if buckets.has(rarity):
+			buckets[rarity].append(card.duplicate())
+
 	var offer: Array[Dictionary] = []
-	for i in range(min(count, pool.size())):
-		offer.append(pool[i])
+	while offer.size() < count:
+		var rarity := _roll_rarity(buckets)
+		if rarity.is_empty():
+			break  # nothing left to offer at all
+		var pool: Array = buckets[rarity]
+		offer.append(pool.pop_at(randi() % pool.size()))
 	return offer
+
+func _roll_rarity(buckets: Dictionary) -> String:
+	var total := 0
+	for rarity in buckets:
+		if not (buckets[rarity] as Array).is_empty():
+			total += int(Constants.SHOP_RARITY_WEIGHTS[rarity])
+	if total == 0:
+		return ""
+	var roll := randi() % total
+	for rarity in buckets:
+		if (buckets[rarity] as Array).is_empty():
+			continue
+		roll -= int(Constants.SHOP_RARITY_WEIGHTS[rarity])
+		if roll < 0:
+			return rarity
+	return ""
 
 func get_card_price(card: Dictionary) -> int:
 	return Constants.CARD_PRICES.get(card.get("rarity", "common"), 50)
@@ -202,13 +270,18 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 				if n in adj:
 					result += int(bets[bet_key]) * 5
 
-	# Loss handling
+	# Loss handling — best protection wins, checked strongest first
 	if result == 0:
+		if GameManager.has_card("loaded_dice") and not GameManager.loaded_dice_used:
+			GameManager.loaded_dice_used = true
+			return total_bet
 		if GameManager.has_card("ghost_ball") and randf() < 0.3:
 			return total_bet
+		if GameManager.has_card("insurance_policy"):
+			return int(total_bet * 0.10)
 		return 0
 
-	# Win bonuses
+	# Win bonuses (additive)
 	if GameManager.has_card("red_rider") and "red" in bets and _payout_ratio("red", number) > 0:
 		result += int(bets["red"] * 0.5)
 
@@ -225,8 +298,25 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 			if key in bets and _payout_ratio(key, number) > 0:
 				result += int(bets[key] * 0.5)
 
+	if GameManager.has_card("midas_touch"):
+		var straight_key := "straight_%d" % number
+		if straight_key in bets:
+			result += int(bets[straight_key] * Constants.PAYOUT_STRAIGHT * 0.5)
+
+	# Win multipliers
 	if GameManager.has_card("prime_protocol") and number in Constants.PRIMES:
 		result = int(result * 1.25)
+
+	if GameManager.has_card("lucky_seven") and number in LUCKY_SEVENS:
+		result *= 2
+
+	if GameManager.has_card("high_roller") and total_bet >= 200:
+		result = int(result * 1.25)
+
+	# loss_streak still holds the pre-spin value here (reset happens afterwards
+	# in GameManager.on_spin_complete), so this pays on the streak-breaking win
+	if GameManager.has_card("cold_streak") and GameManager.loss_streak >= 3:
+		result *= 3
 
 	if GameManager.has_card("streak_counter"):
 		result = int(result * GameManager.get_streak_multiplier())

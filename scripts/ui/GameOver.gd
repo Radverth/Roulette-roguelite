@@ -1,9 +1,15 @@
 extends Control
 
+# Doubles as the victory screen: beating Ante 8 routes here with run_won set,
+# offering the choice between banking the win and descending into endless mode.
+var _is_victory := false
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_is_victory = GameManager.run_won
 	_build_ui()
-	GameManager.game_active = false
+	if not _is_victory:
+		GameManager.game_active = false
 
 func _build_ui() -> void:
 	# Dark red radial gradient bg
@@ -38,12 +44,12 @@ func _build_ui() -> void:
 	devil_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(devil_icon)
 
-	# RUINED title
+	# RUINED / THE HOUSE FALLS title
 	var title := Label.new()
-	title.text = "RUINED"
+	title.text = "THE HOUSE FALLS" if _is_victory else "RUINED"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", Constants.COLOR_CRIMSON)
-	title.add_theme_font_size_override("font_size", 96)
+	title.add_theme_color_override("font_color", Constants.COLOR_GOLD if _is_victory else Constants.COLOR_CRIMSON)
+	title.add_theme_font_size_override("font_size", 76 if _is_victory else 96)
 	root.add_child(title)
 
 	# Flame divider - 240px wide
@@ -58,7 +64,9 @@ func _build_ui() -> void:
 
 	# Subtitle
 	var subtitle := Label.new()
-	if GameManager.run_failed:
+	if _is_victory:
+		subtitle.text = "Ante %s conquered. The Devil tips his hat.\nWalk away rich… or see how deep the parlour goes." % Constants.rom(Constants.WIN_ANTE)
+	elif GameManager.run_failed:
 		subtitle.text = "The House demanded %d chips. You fell short.\nYour seat at the table grows cold." % GameManager.target
 	else:
 		subtitle.text = "The House has taken everything.\nYour seat at the table grows cold."
@@ -75,7 +83,8 @@ func _build_ui() -> void:
 	stats_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	root.add_child(stats_row)
 
-	_add_stat_col(stats_row, "REACHED", "Ante %s" % Constants.rom(GameManager.ante))
+	var reached_ante := GameManager.ante - 1 if _is_victory else GameManager.ante
+	_add_stat_col(stats_row, "CONQUERED" if _is_victory else "REACHED", "Ante %s" % Constants.rom(reached_ante))
 	stats_row.add_child(_make_stat_divider())
 	_add_stat_col(stats_row, "JOKERS", str(GameManager.owned_cards.size()))
 
@@ -92,15 +101,24 @@ func _build_ui() -> void:
 	spacer.custom_minimum_size = Vector2(0, 20)
 	root.add_child(spacer)
 
-	# "Start New Run" button using btn_normal.png
-	var new_run_btn := _make_image_btn("START NEW RUN", 520, 110)
-	new_run_btn.pressed.connect(_on_play_again)
-	root.add_child(new_run_btn)
+	if _is_victory:
+		var endless_btn := _make_image_btn("DESCEND FURTHER", 520, 110)
+		endless_btn.pressed.connect(_on_descend_endless)
+		root.add_child(endless_btn)
 
-	# "Exit to Main Menu" — bordered secondary button
-	var menu_btn := _make_border_btn("EXIT TO MAIN MENU", 420, 86)
-	menu_btn.pressed.connect(_on_main_menu)
-	root.add_child(menu_btn)
+		var glory_btn := _make_border_btn("CLAIM YOUR GLORY", 420, 86)
+		glory_btn.pressed.connect(_on_claim_glory)
+		root.add_child(glory_btn)
+	else:
+		# "Start New Run" button using btn_normal.png
+		var new_run_btn := _make_image_btn("START NEW RUN", 520, 110)
+		new_run_btn.pressed.connect(_on_play_again)
+		root.add_child(new_run_btn)
+
+		# "Exit to Main Menu" — bordered secondary button
+		var menu_btn := _make_border_btn("EXIT TO MAIN MENU", 420, 86)
+		menu_btn.pressed.connect(_on_main_menu)
+		root.add_child(menu_btn)
 
 func _make_stat_divider() -> ColorRect:
 	var divider := ColorRect.new()
@@ -174,6 +192,20 @@ func _make_border_btn(text: String, w: int, h: int) -> Button:
 
 	btn.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	return btn
+
+func _on_descend_endless() -> void:
+	AudioManager.play_ui_click()
+	GameManager.run_won = false
+	GameManager.endless_mode = true
+	# Continue the run through the usual between-antes flow (shop or boss)
+	get_tree().change_scene_to_file("res://scenes/FloorTransition.tscn")
+
+func _on_claim_glory() -> void:
+	AudioManager.play_ui_click()
+	SaveManager.save_run(GameManager.chips, GameManager.ante - 1)
+	GameManager.run_won = false
+	GameManager.game_active = false
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _on_play_again() -> void:
 	AudioManager.play_ui_click()

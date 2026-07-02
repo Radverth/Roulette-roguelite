@@ -14,8 +14,14 @@ Built with **Godot 4.3** (Mobile renderer, 1080×1920 portrait).
   even-chance bets 1:1.
 - Reach the **GOAL** before your 4 hands are spent to clear the Ante.
   Fall short, or drop below 5 chips, and you are **RUINED**.
+- Clearing an Ante pays a **bounty**: a flat reward plus interest on your
+  banked chips — greed is rewarded, up to a cap.
 - Between Antes, spend chips in the Velvet Shop on Jokers — passive cards
-  that bend the odds (extra payouts, refunds, blocked pockets…).
+  that bend the odds (extra payouts, refunds, loss-streak jackpots, once-per-
+  ante saves…). Offers are rarity-weighted; rerolls cost chips and the price
+  climbs with each use.
+- Conquer **Ante VIII** and the House falls — claim your glory, or descend
+  into **endless mode** and see how deep the parlour goes.
 - Every third Ante is a **Boss Blind** with a house rule that lasts the whole
   Ante:
   - **THE CROUPIER** — red numbers pay nothing.
