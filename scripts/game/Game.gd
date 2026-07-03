@@ -29,6 +29,8 @@ var _is_spinning  := false
 var _rot_accum    := 0.0
 var _ball_accum   := 0.0
 var _pending_ante_up := false
+var _shown_chips  := 0
+var _chips_tween: Tween
 
 const WIN_LINES := [
 	"Beginner's luck. Savour it — the House has a long memory.",
@@ -46,6 +48,11 @@ const PUSH_LINES := [
 	"A push. The wheel toys with you before it feasts.",
 	"Even fate hesitates tonight. Do not mistake it for mercy.",
 ]
+const ZERO_LINES := [
+	"ZERO! That is MY pocket, mortal. How generous of you to visit.",
+	"The green void claims all. Even my appetite has limits… almost.",
+	"The house's favourite number. Mine too. What a coincidence.",
+]
 
 # ── Layout heights (sum = 1920px) ────────────────────────────────────────────
 const H_ANTE   := 130  # "Ante I" top bar
@@ -57,10 +64,10 @@ const H_TABLE  := 600  # betting table (1080 × 600 image, full width)
 const H_MSG    := 90   # message row
 const H_CHIPS  := 140  # chip selector
 const H_BTNS   := 280  # CLEAR + SPIN
-const H_PAD    := 350  # bottom padding
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_shown_chips = GameManager.chips
 	_build_ui()
 	_connect_signals()
 	_refresh_hud()
@@ -547,6 +554,7 @@ func _connect_signals() -> void:
 	_spin_btn.pressed.connect(_on_spin_pressed)
 	_clear_btn.pressed.connect(_on_clear_pressed)
 	_table.bet_placed.connect(_on_bet_placed)
+	_table.bet_rejected.connect(_on_bet_rejected)
 	GameManager.chips_changed.connect(_on_chips_changed)
 	GameManager.hand_changed.connect(_on_hand_changed)
 	GameManager.ante_changed.connect(_on_ante_changed)
@@ -560,7 +568,25 @@ func _refresh_hud() -> void:
 	_on_ante_changed(GameManager.ante, GameManager.chips, GameManager.target)
 
 func _on_chips_changed(amount: int) -> void:
-	_chips_lbl.text = _fmt(amount)
+	if amount == _shown_chips:
+		_chips_lbl.text = _fmt(amount)
+		return
+	# Animated count-up/down with a scale pop — makes every payout feel tactile
+	if _chips_tween and _chips_tween.is_valid():
+		_chips_tween.kill()
+	_chips_lbl.pivot_offset = _chips_lbl.size / 2.0
+	_chips_lbl.scale = Vector2.ONE
+	_chips_tween = create_tween()
+	_chips_tween.set_parallel(true)
+	_chips_tween.tween_method(_set_chips_text, _shown_chips, amount, 0.45)
+	var pop := Vector2(1.18, 1.18) if amount > _shown_chips else Vector2(0.9, 0.9)
+	_chips_tween.tween_property(_chips_lbl, "scale", pop, 0.10)
+	_chips_tween.set_parallel(false)
+	_chips_tween.tween_property(_chips_lbl, "scale", Vector2.ONE, 0.18)
+
+func _set_chips_text(value: int) -> void:
+	_shown_chips = value
+	_chips_lbl.text = _fmt(value)
 
 func _on_hand_changed(hand: int, max_hand: int) -> void:
 	_hand_lbl.text = "HAND %d / %d" % [hand, max_hand]
@@ -601,11 +627,25 @@ func _refresh_jokers() -> void:
 			ic.set_anchors_preset(Control.PRESET_FULL_RECT)
 			ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			slot.add_child(ic)
+		else:
+			# No icon art yet — show the card's monogram in its rarity colour
+			var mono := Label.new()
+			mono.text = _monogram(card.get("name", "?"))
+			mono.set_anchors_preset(Control.PRESET_FULL_RECT)
+			mono.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			mono.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+			mono.add_theme_color_override("font_color", accent)
+			mono.add_theme_font_size_override("font_size", 22)
+			mono.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			slot.add_child(mono)
 
 func _on_bet_placed(_key: String, _amount: int) -> void:
 	var total := _table.get_total_bet()
 	_staked_lbl.text = "STAKED %s" % _fmt(total)
 	_msg_lbl.text = "Wager placed — spin when ready"
+
+func _on_bet_rejected() -> void:
+	_msg_lbl.text = "Not enough chips for that wager"
 
 # ── Chip selection ─────────────────────────────────────────────────────────────
 func _on_chip_selected(value: int) -> void:
@@ -641,7 +681,8 @@ func _on_spin_pressed() -> void:
 		var seq := Constants.WHEEL_SEQUENCE
 		var idx := seq.find(0)
 		var size := seq.size()
-		number = seq[idx + (1 if randi() % 2 == 0 else -1 + size) % size]
+		var step := 1 if randi() % 2 == 0 else -1
+		number = seq[(idx + step + size) % size]
 
 	# triple_ball: spin 3 balls; CardManager picks best payout automatically
 	GameManager.triple_ball_numbers.clear()
@@ -728,8 +769,13 @@ func _show_result(number: int, staked: int) -> void:
 	GameManager.add_chips(payout)
 	GameManager.on_spin_complete(payout > staked)
 
-	# Show number in wheel center
+	# Show number in wheel center with a pop-in
 	_result_circle.show()
+	_result_circle.pivot_offset = _result_circle.size / 2.0
+	_result_circle.scale = Vector2(0.2, 0.2)
+	var pop_tw := create_tween()
+	pop_tw.tween_property(_result_circle, "scale", Vector2.ONE, 0.35)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	_result_number_lbl.text = str(number)
 	var circ_bg := _result_circle.get_node_or_null("CircleBg") as ColorRect
 	if circ_bg:
@@ -746,16 +792,27 @@ func _show_result(number: int, staked: int) -> void:
 	if net > 0:
 		pool = WIN_LINES
 		outcome_text = "+%s chips" % _fmt(net)
+		if GameManager.win_streak >= 2:
+			outcome_text += "   ·   STREAK ×%d" % GameManager.win_streak
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 		_trigger_win_burst()
-	elif payout > 0:
+		AudioManager.play_win()
+		# Big wins rattle the table
+		if net >= staked * 2:
+			_shake_overlay(10.0)
+		else:
+			_shake_overlay(4.0)
+	elif net == 0:
 		pool = PUSH_LINES
 		outcome_text = "Pushed — %s returned" % _fmt(payout)
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	else:
 		pool = LOSS_LINES
-		outcome_text = "Lost %s chips" % _fmt(staked)
+		outcome_text = "Lost %s chips" % _fmt(-net)
 		_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_CRIMSON)
+		AudioManager.play_loss()
+	if number == 0 and net <= 0:
+		pool = ZERO_LINES
 
 	_dialogue_lbl.text = pool[randi() % pool.size()]
 	_spin_overlay.get_node_or_null("DialogueBox").show()
@@ -769,8 +826,17 @@ func _show_result(number: int, staked: int) -> void:
 
 func _continue_label() -> String:
 	if GameManager.check_game_over():
-		return "RUIN ACCEPTED"
+		return "ACCEPT RUIN"
+	if _pending_ante_up:
+		return "ANTE CLEARED"
 	return "NEXT SPIN"
+
+func _shake_overlay(intensity: float) -> void:
+	var tw := create_tween()
+	for i in range(5):
+		var offset := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * intensity
+		tw.tween_property(_spin_overlay, "position", offset, 0.04)
+	tw.tween_property(_spin_overlay, "position", Vector2.ZERO, 0.05)
 
 func _trigger_win_burst() -> void:
 	var burst := _spin_overlay.get_node_or_null("WinBurst")
@@ -795,6 +861,12 @@ func _on_continue_pressed() -> void:
 
 	if GameManager.check_game_over():
 		_go_game_over()
+		return
+
+	if GameManager.run_won:
+		# Beat the final ante — victory screen offers glory or endless descent
+		_pending_ante_up = false
+		get_tree().change_scene_to_file("res://scenes/GameOver.tscn")
 		return
 
 	if _pending_ante_up:
@@ -875,5 +947,22 @@ func _action_btn(text: String, is_primary: bool) -> Button:
 
 	return btn
 
+func _monogram(card_name: String) -> String:
+	var letters := ""
+	for word in card_name.split(" ", false):
+		letters += word.substr(0, 1).to_upper()
+		if letters.length() >= 2:
+			break
+	return letters
+
 func _fmt(n: int) -> String:
-	return str(n)
+	var neg := n < 0
+	var s := str(absi(n))
+	var out := ""
+	var count := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" + out) if neg else out

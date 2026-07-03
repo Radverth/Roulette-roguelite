@@ -42,6 +42,16 @@ func _build_ui() -> void:
 	floor_lbl.modulate.a = 0.0
 	center.add_child(floor_lbl)
 
+	var bounty_lbl: Label = null
+	if GameManager.last_bounty > 0:
+		bounty_lbl = Label.new()
+		bounty_lbl.text = "The House pays its debts:  +%d chips" % GameManager.last_bounty
+		bounty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		bounty_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
+		bounty_lbl.add_theme_font_size_override("font_size", 32)
+		bounty_lbl.modulate.a = 0.0
+		center.add_child(bounty_lbl)
+
 	var div := TextureRect.new()
 	if ResourceLoader.exists("res://assets/effects/flame_divider.png"):
 		div.texture = load("res://assets/effects/flame_divider.png")
@@ -67,6 +77,8 @@ func _build_ui() -> void:
 	tween.set_parallel(true)
 	tween.tween_property(ante_lbl,     "modulate:a", 1.0, 0.7)
 	tween.tween_property(floor_lbl,    "modulate:a", 1.0, 0.7).set_delay(0.3)
+	if bounty_lbl:
+		tween.tween_property(bounty_lbl, "modulate:a", 1.0, 0.7).set_delay(0.5)
 	tween.tween_property(div,          "modulate:a", 1.0, 0.7).set_delay(0.6)
 	tween.tween_property(entering_lbl, "modulate:a", 1.0, 0.7).set_delay(0.9)
 
@@ -79,8 +91,9 @@ func _build_ui() -> void:
 	fade.tween_property(self, "modulate:a", 0.0, 0.5)
 
 	if is_boss:
-		# Set up boss modifier for this ante
-		var idx := (GameManager.ante - 1) % Constants.BOSS_MODIFIERS.size()
+		# Set up boss modifier for this ante — rotate per boss encounter
+		# (ante is always a multiple of 3 here, so index by encounter count)
+		var idx := (GameManager.ante / 3 - 1) % Constants.BOSS_MODIFIERS.size()
 		GameManager.is_boss_floor = true
 		GameManager.current_boss_modifier = Constants.BOSS_MODIFIERS[idx]
 		fade.tween_callback(func(): get_tree().change_scene_to_file("res://scenes/BossReveal.tscn"))

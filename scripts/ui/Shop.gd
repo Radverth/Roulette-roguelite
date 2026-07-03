@@ -2,7 +2,7 @@ extends Control
 
 var _offer: Array[Dictionary] = []
 var _chips_lbl: Label = null
-var _rerolls_left: int = 3
+var _reroll_cost: int = Constants.REROLL_BASE_COST
 var _reroll_btn: Button = null
 var _cards_container: HBoxContainer = null
 
@@ -12,7 +12,10 @@ func _ready() -> void:
 	_build_ui()
 	var devil := DevilDialogue.new()
 	add_child(devil)
-	get_tree().create_timer(0.6).timeout.connect(func(): devil.say("shop", 4.0))
+	get_tree().create_timer(0.6).timeout.connect(func():
+		if is_instance_valid(devil):
+			devil.say("shop", 4.0)
+	)
 
 func _build_ui() -> void:
 	# Background
@@ -107,10 +110,11 @@ func _build_ui() -> void:
 	spacer.custom_minimum_size = Vector2(0, 16)
 	root.add_child(spacer)
 
-	# Reroll button
-	_reroll_btn = _make_image_btn("REROLL  ·  %d" % _rerolls_left, 460, 100)
+	# Reroll button — costs chips, price climbs with each use
+	_reroll_btn = _make_image_btn("", 460, 100)
 	_reroll_btn.pressed.connect(_on_reroll)
 	root.add_child(_reroll_btn)
+	_update_reroll_btn()
 
 	# LEAVE button
 	var leave_btn := _make_border_btn("LEAVE", 320, 80)
@@ -178,7 +182,7 @@ func _populate_card_grid() -> void:
 			_cards_container.add_child(_build_card_panel(card))
 
 func _get_shop_message() -> String:
-	if GameManager.owned_cards.size() >= Constants.MAX_OWNED_CARDS:
+	if GameManager.owned_cards.size() >= GameManager.get_max_cards():
 		return "Your hand is full. Sell a Joker to make room."
 	if _offer.is_empty():
 		return "The parlour has nothing more to offer."
@@ -189,7 +193,7 @@ func _build_card_panel(card: Dictionary) -> Control:
 	var rarity_color: Color = Constants.CARD_RARITY_COLORS.get(rarity, Color.WHITE)
 	var price := CardManager.get_card_price(card)
 	var can_afford := GameManager.chips >= price
-	var is_full := GameManager.owned_cards.size() >= Constants.MAX_OWNED_CARDS
+	var is_full := GameManager.owned_cards.size() >= GameManager.get_max_cards()
 
 	# 208×290px — double the prototype 104×145 to fit portrait phone resolution
 	var panel := Panel.new()
@@ -270,14 +274,18 @@ func _build_card_panel(card: Dictionary) -> Control:
 	else:
 		var buy_btn := _make_price_btn(price, can_afford and not is_full)
 		buy_btn.pressed.connect(func():
+			# Verify capacity BEFORE taking payment so chips are never lost
+			if GameManager.owned_cards.size() >= GameManager.get_max_cards():
+				return
 			if not GameManager.spend_chips(price):
 				return
 			GameManager.add_card(card)
-			buy_btn.disabled = true
-			buy_btn.text = "PURCHASED"
 			if _chips_lbl:
 				_chips_lbl.text = str(GameManager.chips)
 			AudioManager.play_card_pickup()
+			# Rebuild so the bought card shows OWNED and other prices re-check affordability
+			_populate_card_grid()
+			_update_reroll_btn()
 		)
 		vbox.add_child(buy_btn)
 
@@ -355,31 +363,38 @@ func _build_sell_section(  ) -> Control:
 			if _chips_lbl:
 				_chips_lbl.text = str(GameManager.chips)
 			btn.queue_free()
+			# Freed chips/slots may re-enable buy buttons
+			_populate_card_grid()
+			_update_reroll_btn()
 		)
 		row.add_child(btn)
 
 	return section
 
+func _update_reroll_btn() -> void:
+	if not _reroll_btn:
+		return
+	_reroll_btn.text = "REROLL  ·  %d" % _reroll_cost
+	_reroll_btn.disabled = GameManager.chips < _reroll_cost
+
 func _on_reroll() -> void:
-	if _rerolls_left <= 0:
+	if not GameManager.spend_chips(_reroll_cost):
 		return
 	AudioManager.play_ui_click()
-	_rerolls_left -= 1
+	_reroll_cost += Constants.REROLL_BASE_COST
+	if _chips_lbl:
+		_chips_lbl.text = str(GameManager.chips)
 	_offer = CardManager.get_shop_offer(3)
 	_populate_card_grid()
-	if _reroll_btn:
-		if _rerolls_left > 0:
-			_reroll_btn.text = "REROLL  ·  %d" % _rerolls_left
-		else:
-			_reroll_btn.text = "REROLL  ·  0"
-			_reroll_btn.disabled = true
+	_update_reroll_btn()
 
 func _on_leave() -> void:
 	AudioManager.play_ui_click()
-	if not GameManager.has_card("velvet_hand"):
-		GameManager.owned_cards.clear()
-		GameManager.emit_signal("cards_changed")
-	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	# Jokers persist for the whole run — they are only lost by selling them.
+	if GameManager.game_active:
+		get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _make_image_btn(text: String, w: int, h: int) -> Button:
 	var btn := Button.new()

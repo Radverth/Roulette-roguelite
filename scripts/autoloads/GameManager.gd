@@ -13,9 +13,15 @@ var hand:      int = 1
 var max_hand:  int = Constants.HANDS_PER_ANTE
 var spin_count: int = 0
 var win_streak: int = 0
+var loss_streak: int = 0
 var owned_cards: Array[Dictionary] = []
 var shop_variant: int = 0
 var game_active: bool = false
+var run_failed: bool = false
+var run_won: bool = false
+var endless_mode: bool = false
+var loaded_dice_used: bool = false
+var last_bounty: int = 0
 
 # Legacy fields kept for card system compatibility
 var floor_number:          int = 1
@@ -35,7 +41,13 @@ func start_new_game() -> void:
 	max_hand     = Constants.HANDS_PER_ANTE
 	spin_count   = 0
 	win_streak   = 0
+	loss_streak  = 0
 	shop_variant = 0
+	run_failed   = false
+	run_won      = false
+	endless_mode = false
+	loaded_dice_used = false
+	last_bounty  = 0
 	owned_cards.clear()
 	is_boss_floor = false
 	current_boss_modifier = {}
@@ -63,7 +75,10 @@ func spend_chips(amount: int) -> bool:
 	return true
 
 func check_game_over() -> bool:
-	return chips < Constants.GAME_OVER_CHIPS
+	return chips < Constants.GAME_OVER_CHIPS or run_failed
+
+func get_max_cards() -> int:
+	return Constants.MAX_OWNED_CARDS + (2 if has_card("velvet_hand") else 0)
 
 func has_card(card_id: String) -> bool:
 	for card in owned_cards:
@@ -72,7 +87,7 @@ func has_card(card_id: String) -> bool:
 	return false
 
 func add_card(card: Dictionary) -> bool:
-	if owned_cards.size() >= Constants.MAX_OWNED_CARDS:
+	if owned_cards.size() >= get_max_cards():
 		return false
 	owned_cards.append(card.duplicate())
 	emit_signal("cards_changed")
@@ -89,8 +104,10 @@ func on_spin_complete(won: bool) -> void:
 	spin_count += 1
 	if won:
 		win_streak += 1
+		loss_streak = 0
 	else:
 		win_streak = 0
+		loss_streak += 1
 	perpetual_counter += 1
 	if has_card("perpetual_motion") and perpetual_counter >= 5:
 		add_chips(50)
@@ -99,23 +116,47 @@ func on_spin_complete(won: bool) -> void:
 		add_chips(1)
 	if has_card("croupiers_tip"):
 		add_chips(25)
+	if has_card("devils_due"):
+		add_chips(mini(int(chips * 0.02), 40))
 
-	# Advance hand; when all hands done, ante up
-	hand += 1
-	if hand > max_hand:
+	# Boss: THE COLLECTOR skims 10% of your chips after every spin
+	if is_boss_floor and current_boss_modifier.get("id", "") == "house_skim":
+		var skim := int(chips * 0.10)
+		if skim > 0:
+			add_chips(-skim)
+
+	# Ante progression: reach the target to advance; run out of hands and fail
+	if chips >= target:
 		hand = 1
 		ante += 1
 		target = int(round(float(target) * Constants.ANTE_SCALE))
 		floor_number  = ante
 		ante_progress = 0
 		ante_target   = target
+		loaded_dice_used = false
+		_pay_ante_bounty()
+		if ante > Constants.WIN_ANTE and not endless_mode:
+			run_won = true
 		emit_signal("ante_up", ante)
-	emit_signal("hand_changed", hand, max_hand)
+	else:
+		hand += 1
+		if hand > max_hand:
+			run_failed = true
+	emit_signal("hand_changed", mini(hand, max_hand), max_hand)
 	emit_signal("ante_changed", ante, chips, target)
+
+# The House pays its debts: flat bounty + interest on banked chips
+func _pay_ante_bounty() -> void:
+	var interest := mini(chips / Constants.BOUNTY_INTEREST_DIV, Constants.BOUNTY_INTEREST_CAP)
+	var bounty := Constants.BOUNTY_FLAT + interest
+	if has_card("silent_partner"):
+		bounty *= 2
+	last_bounty = bounty
+	add_chips(bounty)
 
 func get_streak_multiplier() -> float:
 	if has_card("streak_counter"):
-		return 1.0 + min(win_streak * 0.05, 0.30)
+		return 1.0 + min(win_streak * 0.10, 0.50)
 	return 1.0
 
 func get_effective_min_bet() -> int:
