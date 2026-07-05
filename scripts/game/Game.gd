@@ -16,10 +16,12 @@ var _chip_btns: Array[Button] = []
 var _spin_btn: Button
 var _clear_btn: Button
 var _spin_overlay: Control
-var _wheel_img: TextureRect
+var _wheel_view: WheelView
 var _ball_img: TextureRect
-var _result_circle: Control
+var _result_circle: Panel
+var _result_circle_style: StyleBoxFlat
 var _result_number_lbl: Label
+var _bets_grid: GridContainer
 var _dialogue_lbl: Label
 var _overlay_msg_lbl: Label
 var _continue_btn: Button
@@ -354,17 +356,18 @@ func _build_action_buttons() -> Control:
 	return section
 
 # ── Spin overlay (full screen) ────────────────────────────────────────────────
-# Layout mirrors the prototype spin screen:
-#   y=0-100:    "THE RESULT" header
-#   y=100-840:  Wheel (740×740 centered at x=540, y=470)
-#   y=850-910:  "No more bets…" / outcome text
-#   y=930-1130: Devil dialogue box
-#   y=1170-1330: NEXT SPIN button
+# Layout:
+#   y=0-100:     "Ante N" header
+#   y=230-890:   Wheel (660×660 centered at x=540, y=560)
+#   y=910-966:   "No more bets…" / outcome text
+#   y=990-1270:  YOUR WAGERS panel (every bet, marked PAID/LOST after the spin)
+#   y=1290-1460: Devil dialogue box
+#   y=1490-1620: NEXT SPIN button
 const _WCX := 540.0   # wheel center x
-const _WCY := 470.0   # wheel center y
-const _WSZ := 740.0   # wheel diameter (image renders at this size)
-const _ORB := 315.0   # ball orbit radius (in star-ring area)
-const _LND := 255.0   # ball land radius (in number-pocket area)
+const _WCY := 560.0   # wheel center y
+const _WSZ := 660.0   # wheel diameter
+const _ORB := 300.0   # ball orbit radius (rim area)
+const _LND := 250.0   # ball land radius (number-pocket band)
 
 func _build_spin_overlay() -> void:
 	# Use explicit size so there is no anchor-system ambiguity
@@ -375,15 +378,15 @@ func _build_spin_overlay() -> void:
 	_spin_overlay.hide()
 	add_child(_spin_overlay)
 
-	# Dark background
+	# Opaque background — the betting table must not ghost through
 	var dim := ColorRect.new()
-	dim.color = Color(0.02, 0.008, 0.008, 0.97)
+	dim.color = Color(0.02, 0.008, 0.008, 1.0)
 	dim.position = Vector2.ZERO
 	dim.size = Vector2(1080, 1920)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(dim)
 
-	# "THE RESULT" header
+	# "Ante N" header
 	var result_hdr := Label.new()
 	result_hdr.name = "OverlayTitle"
 	result_hdr.text = "THE RESULT"
@@ -392,60 +395,22 @@ func _build_spin_overlay() -> void:
 	result_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_hdr.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	result_hdr.add_theme_color_override("font_color", Constants.COLOR_GOLD)
-	result_hdr.add_theme_font_size_override("font_size", 22)
+	result_hdr.add_theme_font_size_override("font_size", 26)
 	result_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(result_hdr)
 
-	var wx := _WCX - _WSZ / 2.0  # = 170
-	var wy := _WCY - _WSZ / 2.0  # = 100
-
-	# Clip container — confines the rotating wheel to its frame rect so it
-	# never bleeds outside the wheel_rim circular boundary.
-	var wheel_clip := Control.new()
-	wheel_clip.position      = Vector2(wx, wy)
-	wheel_clip.size          = Vector2(_WSZ, _WSZ)
-	wheel_clip.clip_contents = true
-	wheel_clip.mouse_filter  = Control.MOUSE_FILTER_IGNORE
-	_spin_overlay.add_child(wheel_clip)
-
-	# Wheel base (ROTATES) — inner sectors; parent is wheel_clip
-	_wheel_img = TextureRect.new()
-	if ResourceLoader.exists("res://assets/wheel/wheel_base.png"):
-		_wheel_img.texture = load("res://assets/wheel/wheel_base.png")
-	_wheel_img.stretch_mode = TextureRect.STRETCH_SCALE
-	_wheel_img.position     = Vector2.ZERO
-	_wheel_img.size         = Vector2(_WSZ, _WSZ)
-	_wheel_img.pivot_offset = Vector2(_WSZ / 2.0, _WSZ / 2.0)
-	_wheel_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wheel_clip.add_child(_wheel_img)
-
-	# Numbers ring (ROTATES with wheel) — rendered on top of sectors inside clip
-	if ResourceLoader.exists("res://assets/wheel/wheel_numbers.png"):
-		var nums := TextureRect.new()
-		nums.texture        = load("res://assets/wheel/wheel_numbers.png")
-		nums.stretch_mode   = TextureRect.STRETCH_SCALE
-		nums.position       = Vector2.ZERO
-		nums.size           = Vector2(_WSZ, _WSZ)
-		nums.pivot_offset   = Vector2(_WSZ / 2.0, _WSZ / 2.0)
-		nums.mouse_filter   = Control.MOUSE_FILTER_IGNORE
-		wheel_clip.add_child(nums)
-		nums.name = "WheelNumbers"
-
-	# Rim overlay (STATIC) — sibling of clip, renders on top as the frame
-	var rim := TextureRect.new()
-	if ResourceLoader.exists("res://assets/wheel/wheel_rim.png"):
-		rim.texture = load("res://assets/wheel/wheel_rim.png")
-	rim.stretch_mode = TextureRect.STRETCH_SCALE
-	rim.position     = Vector2(wx, wy)
-	rim.size         = Vector2(_WSZ, _WSZ)
-	rim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_spin_overlay.add_child(rim)
+	# Procedurally drawn wheel — sectors, numbers and rim always in sync
+	_wheel_view = WheelView.new()
+	_wheel_view.position = Vector2(_WCX - _WSZ / 2.0, _WCY - _WSZ / 2.0)
+	_wheel_view.size     = Vector2(_WSZ, _WSZ)
+	_wheel_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spin_overlay.add_child(_wheel_view)
 
 	# Gold pointer triangle at top of wheel
 	var pointer := ColorRect.new()
 	pointer.color    = Constants.COLOR_GOLD
-	pointer.size     = Vector2(14, 28)
-	pointer.position = Vector2(_WCX - 7.0, wy - 14.0)
+	pointer.size     = Vector2(14, 30)
+	pointer.position = Vector2(_WCX - 7.0, _WCY - _WSZ / 2.0 - 16.0)
 	pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(pointer)
 
@@ -460,19 +425,18 @@ func _build_spin_overlay() -> void:
 	_spin_overlay.add_child(_ball_img)
 
 	# Result number circle (centered on wheel hub, shown after spin)
-	_result_circle = Control.new()
+	_result_circle = Panel.new()
 	_result_circle.position = Vector2(_WCX - 65.0, _WCY - 65.0)
 	_result_circle.size     = Vector2(130, 130)
 	_result_circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_result_circle_style = StyleBoxFlat.new()
+	_result_circle_style.bg_color = Color(0.08, 0.03, 0.03)
+	_result_circle_style.border_color = Constants.COLOR_GOLD
+	_result_circle_style.set_border_width_all(3)
+	_result_circle_style.set_corner_radius_all(65)
+	_result_circle.add_theme_stylebox_override("panel", _result_circle_style)
 	_result_circle.hide()
 	_spin_overlay.add_child(_result_circle)
-
-	var circle_bg := ColorRect.new()
-	circle_bg.name = "CircleBg"
-	circle_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	circle_bg.color = Color(0.08, 0.03, 0.03)
-	circle_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_result_circle.add_child(circle_bg)
 
 	_result_number_lbl = Label.new()
 	_result_number_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -498,20 +462,58 @@ func _build_spin_overlay() -> void:
 
 	# "No more bets…" / outcome text
 	_overlay_msg_lbl = Label.new()
-	_overlay_msg_lbl.position = Vector2(0, 855)
+	_overlay_msg_lbl.position = Vector2(0, 910)
 	_overlay_msg_lbl.size     = Vector2(1080, 56)
 	_overlay_msg_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_overlay_msg_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
-	_overlay_msg_lbl.add_theme_font_size_override("font_size", 28)
+	_overlay_msg_lbl.add_theme_font_size_override("font_size", 30)
 	_overlay_msg_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(_overlay_msg_lbl)
+
+	# YOUR WAGERS panel — the answer to "what did I bet on?"
+	var bets_panel := Panel.new()
+	bets_panel.position = Vector2(60, 990)
+	bets_panel.size     = Vector2(960, 280)
+	bets_panel.clip_contents = true
+	bets_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bets_style := StyleBoxFlat.new()
+	bets_style.bg_color     = Color(0.06, 0.02, 0.02, 0.9)
+	bets_style.border_color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.4)
+	bets_style.set_border_width_all(1)
+	bets_style.set_corner_radius_all(10)
+	bets_panel.add_theme_stylebox_override("panel", bets_style)
+	_spin_overlay.add_child(bets_panel)
+
+	var bets_vbox := VBoxContainer.new()
+	bets_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bets_vbox.offset_left = 30.0
+	bets_vbox.offset_top = 14.0
+	bets_vbox.offset_right = -30.0
+	bets_vbox.offset_bottom = -14.0
+	bets_vbox.add_theme_constant_override("separation", 8)
+	bets_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bets_panel.add_child(bets_vbox)
+
+	var bets_hdr := Label.new()
+	bets_hdr.text = "YOUR WAGERS"
+	bets_hdr.add_theme_color_override("font_color", Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.85))
+	bets_hdr.add_theme_font_size_override("font_size", 20)
+	bets_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bets_vbox.add_child(bets_hdr)
+
+	_bets_grid = GridContainer.new()
+	_bets_grid.columns = 2
+	_bets_grid.add_theme_constant_override("h_separation", 40)
+	_bets_grid.add_theme_constant_override("v_separation", 6)
+	_bets_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bets_vbox.add_child(_bets_grid)
 
 	# Devil dialogue box
 	var dlg_box := Panel.new()
 	dlg_box.name     = "DialogueBox"
-	dlg_box.position = Vector2(60, 930)
-	dlg_box.size     = Vector2(960, 180)
+	dlg_box.position = Vector2(60, 1290)
+	dlg_box.size     = Vector2(960, 170)
 	dlg_box.hide()
 	var dlg_style := StyleBoxFlat.new()
 	dlg_style.bg_color     = Color(0.08, 0.02, 0.02, 0.95)
@@ -526,13 +528,13 @@ func _build_spin_overlay() -> void:
 		devil_icon.texture = load("res://assets/effects/devil_watermark.png")
 	devil_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	devil_icon.position     = Vector2(12, 10)
-	devil_icon.size         = Vector2(64, 160)
+	devil_icon.size         = Vector2(64, 150)
 	devil_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dlg_box.add_child(devil_icon)
 
 	_dialogue_lbl = Label.new()
 	_dialogue_lbl.position     = Vector2(90, 14)
-	_dialogue_lbl.size         = Vector2(856, 152)
+	_dialogue_lbl.size         = Vector2(856, 142)
 	_dialogue_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_dialogue_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	_dialogue_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -543,7 +545,7 @@ func _build_spin_overlay() -> void:
 
 	# NEXT SPIN / CONTINUE button
 	_continue_btn = _action_btn("NEXT SPIN", true)
-	_continue_btn.position = Vector2(540 - 200, 1170)
+	_continue_btn.position = Vector2(540 - 200, 1490)
 	_continue_btn.size     = Vector2(400, 130)
 	_continue_btn.hide()
 	_continue_btn.pressed.connect(_on_continue_pressed)
@@ -704,8 +706,12 @@ func _open_spin_overlay(number: int, staked: int) -> void:
 	_spin_overlay.get_node_or_null("DialogueBox").hide()
 	_overlay_msg_lbl.text = "No more bets…"
 	_overlay_msg_lbl.modulate.a = 1.0
+	_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	var burst := _spin_overlay.get_node_or_null("WinBurst")
 	if burst: burst.hide()
+
+	# Show what's riding on this spin right away
+	_populate_bets_panel(_table.get_bets(), -1)
 
 	# Ball initial orbit position
 	_orbit_ball(_ball_accum)
@@ -739,10 +745,7 @@ func _open_spin_overlay(number: int, staked: int) -> void:
 	tw.tween_callback(func(): _land_ball(number, staked))
 
 func _rotate_wheel(angle: float) -> void:
-	_wheel_img.rotation = angle
-	var nums := _wheel_img.get_parent().get_node_or_null("WheelNumbers") as TextureRect
-	if nums:
-		nums.rotation = angle
+	_wheel_view.wheel_rotation = angle
 
 func _orbit_ball(arc: float) -> void:
 	_ball_img.position = Vector2(
@@ -777,14 +780,15 @@ func _show_result(number: int, staked: int) -> void:
 	pop_tw.tween_property(_result_circle, "scale", Vector2.ONE, 0.35)\
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	_result_number_lbl.text = str(number)
-	var circ_bg := _result_circle.get_node_or_null("CircleBg") as ColorRect
-	if circ_bg:
-		if number == 0:
-			circ_bg.color = Color(0.1, 0.25, 0.1)
-		elif number in Constants.RED_NUMBERS:
-			circ_bg.color = Color(0.55, 0.04, 0.04)
-		else:
-			circ_bg.color = Color(0.05, 0.05, 0.05)
+	if number == 0:
+		_result_circle_style.bg_color = Color(0.1, 0.25, 0.1)
+	elif number in Constants.RED_NUMBERS:
+		_result_circle_style.bg_color = Color(0.55, 0.04, 0.04)
+	else:
+		_result_circle_style.bg_color = Color(0.05, 0.05, 0.05)
+
+	# Mark every wager PAID or LOST
+	_populate_bets_panel(bets, number)
 
 	# Dialogue
 	var pool: Array
@@ -823,6 +827,48 @@ func _show_result(number: int, staked: int) -> void:
 
 	_continue_btn.show()
 	_continue_btn.text = _continue_label()
+
+# Fill the YOUR WAGERS panel. result_number == -1 means the spin is still
+# running (neutral list); otherwise each bet is marked PAID or LOST.
+func _populate_bets_panel(bets: Dictionary, result_number: int) -> void:
+	for child in _bets_grid.get_children():
+		child.queue_free()
+	var keys := bets.keys()
+	keys.sort()
+	for key in keys:
+		var lbl := Label.new()
+		var text := "%s  ·  %s" % [_bet_label(key), _fmt(int(bets[key]))]
+		var col := Constants.COLOR_TEXT
+		if result_number >= 0:
+			if CardManager.bet_hits(key, result_number):
+				text += "  — PAID"
+				col = Constants.COLOR_GOLD
+			else:
+				text += "  — LOST"
+				col = Color(0.72, 0.30, 0.26)
+		lbl.text = text
+		lbl.add_theme_color_override("font_color", col)
+		lbl.add_theme_font_size_override("font_size", 24)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bets_grid.add_child(lbl)
+
+func _bet_label(key: String) -> String:
+	if key.begins_with("straight_"):
+		return "NUMBER %s" % key.trim_prefix("straight_")
+	match key:
+		"red":    return "RED"
+		"black":  return "BLACK"
+		"odd":    return "ODD"
+		"even":   return "EVEN"
+		"low":    return "LOW 1-18"
+		"high":   return "HIGH 19-36"
+		"dozen1": return "1ST DOZEN"
+		"dozen2": return "2ND DOZEN"
+		"dozen3": return "3RD DOZEN"
+		"col1":   return "COLUMN 1"
+		"col2":   return "COLUMN 2"
+		"col3":   return "COLUMN 3"
+	return key.to_upper()
 
 func _continue_label() -> String:
 	if GameManager.check_game_over():

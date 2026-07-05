@@ -148,13 +148,15 @@ func _build() -> void:
 		btn.add_child(chip)
 		_chip_sprites[key] = chip
 
-		# Amount label
+		# Amount label — outlined so it reads over any zone colour
 		var lbl := Label.new()
 		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 		lbl.add_theme_color_override("font_color", Color.WHITE)
-		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		lbl.add_theme_constant_override("outline_size", 8)
+		lbl.add_theme_font_size_override("font_size", 22)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl.hide()
 		btn.add_child(lbl)
@@ -188,6 +190,10 @@ func _on_zone_pressed(key: String) -> void:
 	var chip: TextureRect = _chip_sprites.get(key)
 	if chip:
 		chip.show()
+	# Persistent gold tint so staked zones stay obvious at a glance
+	var glow: ColorRect = _win_glows.get(key)
+	if glow:
+		glow.color = Color(0.788, 0.659, 0.298, 0.18)
 	emit_signal("bet_placed", key, bets[key])
 
 func set_chip_amount(amount: int) -> void:
