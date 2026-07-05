@@ -34,6 +34,15 @@ var _ball_accum   := 0.0
 var _pending_ante_up := false
 var _shown_chips  := 0
 var _chips_tween: Tween
+var _spin_tween: Tween
+var _ball_from    := 0.0
+var _ball_to      := 0.0
+var _last_bets: Dictionary = {}
+var _rebet_btn: Button
+var _change_btn: Button
+var _ov_goal_lbl: Label
+var _ov_bar_fill: ColorRect
+var _joker_bonus_lbl: Label
 
 const WIN_LINES := [
 	"Beginner's luck. Savour it — the House has a long memory.",
@@ -349,8 +358,10 @@ func _make_chip_button(value: int) -> Button:
 	if ResourceLoader.exists("res://assets/layout/chip_default.png"):
 		var sn := StyleBoxTexture.new()
 		sn.texture = load("res://assets/layout/chip_default.png")
-		btn.add_theme_stylebox_override("normal", sn)
-		btn.add_theme_stylebox_override("focus",  sn)
+		# Override every state — otherwise the default gray theme stylebox
+		# shows through on hover/press (touch leaves buttons in hover state)
+		for state in ["normal", "focus", "hover", "pressed", "disabled"]:
+			btn.add_theme_stylebox_override(state, sn)
 	btn.pressed.connect(_on_chip_selected.bind(value))
 	return btn
 
@@ -392,17 +403,17 @@ func _build_action_buttons() -> Control:
 
 # ── Spin overlay (full screen) ────────────────────────────────────────────────
 # Layout:
-#   y=0-100:     "Ante N" header
-#   y=230-890:   Wheel (660×660 centered at x=540, y=560)
-#   y=910-966:   "No more bets…" / outcome text
-#   y=990-1270:  YOUR WAGERS panel (every bet, marked PAID/LOST after the spin)
-#   y=1290-1460: Devil dialogue box
-#   y=1490-1620: NEXT SPIN button
+#   y=0-90:      run header (ante · hand | chips/goal) + progress bar
+#   y=150-850:   Wheel (700×700 centered at x=540, y=500)
+#   y=860-942:   "No more bets…" / big outcome text
+#   y=960-1260:  YOUR WAGERS panel (per-bet returns + joker bonus)
+#   y=1280-1430: Devil dialogue box
+#   y=1460-1590: CHANGE BETS + REBET & SPIN (or single continue)
 const _WCX := 540.0   # wheel center x
-const _WCY := 560.0   # wheel center y
-const _WSZ := 660.0   # wheel diameter
-const _ORB := 300.0   # ball orbit radius (rim area)
-const _LND := 250.0   # ball land radius (number-pocket band)
+const _WCY := 500.0   # wheel center y
+const _WSZ := 700.0   # wheel diameter
+const _ORB := 320.0   # ball orbit radius (rim area)
+const _LND := 268.0   # ball land radius (number-pocket band)
 
 func _build_spin_overlay() -> void:
 	# Use explicit size so there is no anchor-system ambiguity
@@ -421,18 +432,42 @@ func _build_spin_overlay() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(dim)
 
-	# "Ante N" header
+	# Run header: "ANTE N · HAND h/H" left, "chips / goal" right, progress bar
 	var result_hdr := Label.new()
 	result_hdr.name = "OverlayTitle"
 	result_hdr.text = "THE RESULT"
-	result_hdr.position = Vector2(0, 0)
-	result_hdr.size     = Vector2(1080, 100)
-	result_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_hdr.position = Vector2(90, 0)
+	result_hdr.size     = Vector2(600, 70)
+	result_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	result_hdr.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	result_hdr.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	result_hdr.add_theme_font_size_override("font_size", 26)
 	result_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(result_hdr)
+
+	_ov_goal_lbl = Label.new()
+	_ov_goal_lbl.position = Vector2(540, 0)
+	_ov_goal_lbl.size     = Vector2(450, 70)
+	_ov_goal_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_ov_goal_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	_ov_goal_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
+	_ov_goal_lbl.add_theme_font_size_override("font_size", 24)
+	_ov_goal_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spin_overlay.add_child(_ov_goal_lbl)
+
+	var ov_bar_bg := ColorRect.new()
+	ov_bar_bg.color = Color(0.12, 0.08, 0.06)
+	ov_bar_bg.position = Vector2(90, 76)
+	ov_bar_bg.size = Vector2(900, 10)
+	ov_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spin_overlay.add_child(ov_bar_bg)
+
+	_ov_bar_fill = ColorRect.new()
+	_ov_bar_fill.color = Constants.COLOR_GOLD
+	_ov_bar_fill.position = Vector2(90, 76)
+	_ov_bar_fill.size = Vector2(0, 10)
+	_ov_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_spin_overlay.add_child(_ov_bar_fill)
 
 	# Procedurally drawn wheel — sectors, numbers and rim always in sync
 	_wheel_view = WheelView.new()
@@ -449,7 +484,7 @@ func _build_spin_overlay() -> void:
 	pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_spin_overlay.add_child(pointer)
 
-	# Ball (positioned by _orbit_ball / _land_ball)
+	# Ball (positioned by _orbit_ball / _ball_flight)
 	_ball_img = TextureRect.new()
 	if ResourceLoader.exists("res://assets/wheel/ball.png"):
 		_ball_img.texture = load("res://assets/wheel/ball.png")
@@ -497,8 +532,8 @@ func _build_spin_overlay() -> void:
 
 	# "No more bets…" / outcome text
 	_overlay_msg_lbl = Label.new()
-	_overlay_msg_lbl.position = Vector2(0, 910)
-	_overlay_msg_lbl.size     = Vector2(1080, 56)
+	_overlay_msg_lbl.position = Vector2(0, 860)
+	_overlay_msg_lbl.size     = Vector2(1080, 82)
 	_overlay_msg_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_overlay_msg_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
@@ -508,8 +543,8 @@ func _build_spin_overlay() -> void:
 
 	# YOUR WAGERS panel — the answer to "what did I bet on?"
 	var bets_panel := Panel.new()
-	bets_panel.position = Vector2(60, 990)
-	bets_panel.size     = Vector2(960, 280)
+	bets_panel.position = Vector2(60, 960)
+	bets_panel.size     = Vector2(960, 300)
 	bets_panel.clip_contents = true
 	bets_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bets_style := StyleBoxFlat.new()
@@ -544,11 +579,19 @@ func _build_spin_overlay() -> void:
 	_bets_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bets_vbox.add_child(_bets_grid)
 
+	# Joker/bonus contribution line — makes the build's power visible
+	_joker_bonus_lbl = Label.new()
+	_joker_bonus_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
+	_joker_bonus_lbl.add_theme_font_size_override("font_size", 24)
+	_joker_bonus_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_joker_bonus_lbl.hide()
+	bets_vbox.add_child(_joker_bonus_lbl)
+
 	# Devil dialogue box
 	var dlg_box := Panel.new()
 	dlg_box.name     = "DialogueBox"
-	dlg_box.position = Vector2(60, 1290)
-	dlg_box.size     = Vector2(960, 170)
+	dlg_box.position = Vector2(60, 1280)
+	dlg_box.size     = Vector2(960, 150)
 	dlg_box.hide()
 	var dlg_style := StyleBoxFlat.new()
 	dlg_style.bg_color     = Color(0.08, 0.02, 0.02, 0.95)
@@ -562,14 +605,18 @@ func _build_spin_overlay() -> void:
 	if ResourceLoader.exists("res://assets/effects/devil_watermark.png"):
 		devil_icon.texture = load("res://assets/effects/devil_watermark.png")
 	devil_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	devil_icon.position     = Vector2(12, 10)
-	devil_icon.size         = Vector2(64, 150)
+	devil_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	# Scale into the assigned rect — the raw texture is larger and would
+	# otherwise draw at native size, spilling out of the dialogue box
+	devil_icon.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	devil_icon.position     = Vector2(16, 10)
+	devil_icon.size         = Vector2(70, 130)
 	devil_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dlg_box.add_child(devil_icon)
 
 	_dialogue_lbl = Label.new()
-	_dialogue_lbl.position     = Vector2(90, 14)
-	_dialogue_lbl.size         = Vector2(856, 142)
+	_dialogue_lbl.position     = Vector2(100, 10)
+	_dialogue_lbl.size         = Vector2(846, 130)
 	_dialogue_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_dialogue_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	_dialogue_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -578,13 +625,34 @@ func _build_spin_overlay() -> void:
 	_dialogue_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dlg_box.add_child(_dialogue_lbl)
 
-	# NEXT SPIN / CONTINUE button
+	# Terminal continue button (ANTE CLEARED / ACCEPT RUIN) — wide enough
+	# for its longest label so text never overflows
 	_continue_btn = _action_btn("NEXT SPIN", true)
-	_continue_btn.position = Vector2(540 - 200, 1490)
-	_continue_btn.size     = Vector2(400, 130)
+	_continue_btn.position = Vector2(540 - 290, 1460)
+	_continue_btn.size     = Vector2(580, 130)
+	_continue_btn.add_theme_font_size_override("font_size", 38)
 	_continue_btn.hide()
 	_continue_btn.pressed.connect(_on_continue_pressed)
 	_spin_overlay.add_child(_continue_btn)
+
+	# Fast loop: change bets vs. instantly re-stake and spin again
+	_change_btn = _action_btn("CHANGE BETS", false)
+	_change_btn.position = Vector2(60, 1460)
+	_change_btn.size     = Vector2(330, 130)
+	_change_btn.hide()
+	_change_btn.pressed.connect(_on_continue_pressed)
+	_spin_overlay.add_child(_change_btn)
+
+	_rebet_btn = _action_btn("REBET & SPIN", true)
+	_rebet_btn.position = Vector2(430, 1460)
+	_rebet_btn.size     = Vector2(590, 130)
+	_rebet_btn.add_theme_font_size_override("font_size", 40)
+	_rebet_btn.hide()
+	_rebet_btn.pressed.connect(_on_rebet_pressed)
+	_spin_overlay.add_child(_rebet_btn)
+
+	# Tap anywhere during the spin to fast-forward to the result
+	_spin_overlay.gui_input.connect(_on_overlay_input)
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _connect_signals() -> void:
@@ -633,8 +701,8 @@ func _on_ante_changed(ante: int, chips_amount: int, target: int) -> void:
 	# Update ante labels in main and overlay
 	if _ante_lbl:
 		_ante_lbl.text = "Ante %s" % Constants.rom(ante)
-	var ot := _spin_overlay.get_node_or_null("OverlayTitle")
-	if ot: ot.text = "Ante %s" % Constants.rom(ante)
+	if _ov_goal_lbl:
+		_update_overlay_header()
 
 	# Progress: chips vs target
 	var ratio := clamp(float(chips_amount) / float(max(target, 1)), 0.0, 1.0)
@@ -661,6 +729,7 @@ func _refresh_jokers() -> void:
 			var ic := TextureRect.new()
 			ic.texture = load(icon_path)
 			ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			ic.set_anchors_preset(Control.PRESET_FULL_RECT)
 			ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			slot.add_child(ic)
@@ -706,10 +775,14 @@ func _on_spin_pressed() -> void:
 	if staked > GameManager.chips:
 		_msg_lbl.text = "Not enough chips!"
 		return
+	_begin_spin()
 
+func _begin_spin() -> void:
 	_is_spinning = true
 	_spin_btn.disabled = true
 	_clear_btn.disabled = true
+	_last_bets = _table.get_bets()
+	var staked := _table.get_total_bet()
 
 	var number := randi() % 37
 
@@ -733,20 +806,45 @@ func _on_spin_pressed() -> void:
 
 	_open_spin_overlay(number, staked)
 
+# One tap re-places the identical bets and spins again — the core loop
+func _on_rebet_pressed() -> void:
+	var staked := 0
+	for key in _last_bets:
+		staked += int(_last_bets[key])
+	if staked == 0 or staked > GameManager.chips:
+		_on_continue_pressed()
+		return
+	AudioManager.play_ui_click()
+	_table.restore_bets(_last_bets)
+	_staked_lbl.text = "STAKED %s" % _fmt(staked)
+	_begin_spin()
+
+func _on_overlay_input(event: InputEvent) -> void:
+	if not (_spin_tween and _spin_tween.is_valid() and _spin_tween.is_running()):
+		return
+	var tapped := (event is InputEventMouseButton and event.pressed) \
+		or (event is InputEventScreenTouch and event.pressed)
+	if tapped:
+		_spin_tween.custom_step(30.0)
+
 func _open_spin_overlay(number: int, staked: int) -> void:
 	# Show overlay
 	_spin_overlay.show()
 	_result_circle.hide()
 	_continue_btn.hide()
+	_rebet_btn.hide()
+	_change_btn.hide()
 	_spin_overlay.get_node_or_null("DialogueBox").hide()
 	_overlay_msg_lbl.text = "No more bets…"
 	_overlay_msg_lbl.modulate.a = 1.0
+	_overlay_msg_lbl.add_theme_font_size_override("font_size", 30)
 	_overlay_msg_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	var burst := _spin_overlay.get_node_or_null("WinBurst")
 	if burst: burst.hide()
 
+	_update_overlay_header()
 	# Show what's riding on this spin right away
-	_populate_bets_panel(_table.get_bets(), -1)
+	_populate_bets_panel(_table.get_bets(), -1, 0)
 
 	# Ball initial orbit position
 	_orbit_ball(_ball_accum)
@@ -766,18 +864,23 @@ func _open_spin_overlay(number: int, staked: int) -> void:
 		new_rot += TAU
 	_rot_accum = new_rot
 
-	var ball_new := _ball_accum - TAU * 9.0
+	# Ball flight ends exactly on the top pocket as the wheel stops —
+	# no separate landing hop, so it never appears to switch pockets.
+	_ball_from = _ball_accum
+	var ball_end := floorf((_ball_from - TAU * 5.0) / TAU) * TAU - TAU / 4.0
+	_ball_to = ball_end
+	_ball_accum = ball_end
 
-	# Animate
-	var tw := create_tween()
-	tw.set_parallel(true)
-	tw.tween_method(_rotate_wheel, prev_rot, new_rot, 4.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
-	tw.tween_method(_orbit_ball, _ball_accum, ball_new, 3.8).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	_ball_accum = ball_new
-
-	tw.set_parallel(false)
-	tw.tween_interval(0.15)
-	tw.tween_callback(func(): _land_ball(number, staked))
+	var spin_dur := 3.4
+	_spin_tween = create_tween()
+	_spin_tween.set_parallel(true)
+	_spin_tween.tween_method(_rotate_wheel, prev_rot, new_rot, spin_dur)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	_spin_tween.tween_method(_ball_flight, 0.0, 1.0, spin_dur)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUART)
+	_spin_tween.set_parallel(false)
+	_spin_tween.tween_interval(0.25)
+	_spin_tween.tween_callback(func(): _show_result(number, staked))
 
 func _rotate_wheel(angle: float) -> void:
 	_wheel_view.wheel_rotation = angle
@@ -788,14 +891,15 @@ func _orbit_ball(arc: float) -> void:
 		_WCY + _ORB * sin(arc) - 20.0
 	)
 
-func _land_ball(number: int, staked: int) -> void:
-	var seq := Constants.WHEEL_SEQUENCE
-	var idx := seq.find(number)
-	var pocket_a := (float(idx) / float(seq.size())) * TAU - TAU / 4.0 + _rot_accum
-	var target_pos := Vector2(_WCX + _LND * cos(pocket_a) - 20.0, _WCY + _LND * sin(pocket_a) - 20.0)
-	var tw := create_tween()
-	tw.tween_property(_ball_img, "position", target_pos, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
-	tw.tween_callback(func(): _show_result(number, staked))
+# t in [0,1] (eased): angle decelerates toward the top pocket while the
+# radius drops from the rim into the pocket band over the final stretch
+func _ball_flight(t: float) -> void:
+	var a := lerpf(_ball_from, _ball_to, t)
+	var r := lerpf(_ORB, _LND, clampf((t - 0.72) / 0.28, 0.0, 1.0))
+	_ball_img.position = Vector2(
+		_WCX + r * cos(a) - 20.0,
+		_WCY + r * sin(a) - 20.0
+	)
 
 func _show_result(number: int, staked: int) -> void:
 	# Calculate payout
@@ -822,8 +926,9 @@ func _show_result(number: int, staked: int) -> void:
 	else:
 		_result_circle_style.bg_color = Color(0.05, 0.05, 0.05)
 
-	# Mark every wager PAID or LOST
-	_populate_bets_panel(bets, number)
+	# Mark every wager with its return
+	_populate_bets_panel(bets, number, payout)
+	_update_overlay_header()
 
 	# Dialogue
 	var pool: Array
@@ -856,36 +961,54 @@ func _show_result(number: int, staked: int) -> void:
 	_dialogue_lbl.text = pool[randi() % pool.size()]
 	_spin_overlay.get_node_or_null("DialogueBox").show()
 	_overlay_msg_lbl.text = outcome_text
+	_overlay_msg_lbl.add_theme_font_size_override("font_size", 46)
 
 	# Table win glows
 	_table.show_win_zones(number)
 
-	_continue_btn.show()
-	_continue_btn.text = _continue_label()
+	# Terminal states get one big button; otherwise offer the fast loop
+	if GameManager.check_game_over() or GameManager.run_won or _pending_ante_up:
+		_continue_btn.text = _continue_label()
+		_continue_btn.show()
+	else:
+		_rebet_btn.disabled = staked > GameManager.chips
+		_rebet_btn.show()
+		_change_btn.show()
 
 # Fill the YOUR WAGERS panel. result_number == -1 means the spin is still
-# running (neutral list); otherwise each bet is marked PAID or LOST.
-func _populate_bets_panel(bets: Dictionary, result_number: int) -> void:
+# running (neutral list); otherwise each bet shows what it returned, and any
+# difference from the total payout is credited to jokers/bonuses.
+func _populate_bets_panel(bets: Dictionary, result_number: int, payout: int) -> void:
 	for child in _bets_grid.get_children():
 		child.queue_free()
 	var keys := bets.keys()
 	keys.sort()
+	var base_sum := 0
 	for key in keys:
+		var amount := int(bets[key])
 		var lbl := Label.new()
-		var text := "%s  ·  %s" % [_bet_label(key), _fmt(int(bets[key]))]
+		var text := "%s  ·  %s" % [_bet_label(key), _fmt(amount)]
 		var col := Constants.COLOR_TEXT
 		if result_number >= 0:
-			if CardManager.bet_hits(key, result_number):
-				text += "  — PAID"
+			var ret := CardManager.bet_return(key, amount, result_number)
+			if ret > 0:
+				text += "  →  +%s" % _fmt(ret)
 				col = Constants.COLOR_GOLD
+				base_sum += ret
 			else:
-				text += "  — LOST"
+				text += "  —  LOST"
 				col = Color(0.72, 0.30, 0.26)
 		lbl.text = text
 		lbl.add_theme_color_override("font_color", col)
 		lbl.add_theme_font_size_override("font_size", 24)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_bets_grid.add_child(lbl)
+
+	if result_number >= 0 and payout > base_sum:
+		_joker_bonus_lbl.text = "JOKERS & BONUSES  →  +%s" % _fmt(payout - base_sum)
+		_joker_bonus_lbl.show()
+	else:
+		_joker_bonus_lbl.hide()
 
 func _bet_label(key: String) -> String:
 	if key.begins_with("straight_"):
@@ -908,9 +1031,23 @@ func _bet_label(key: String) -> String:
 func _continue_label() -> String:
 	if GameManager.check_game_over():
 		return "ACCEPT RUIN"
+	if GameManager.run_won:
+		return "THE HOUSE FALLS"
 	if _pending_ante_up:
 		return "ANTE CLEARED"
 	return "NEXT SPIN"
+
+func _update_overlay_header() -> void:
+	var ot := _spin_overlay.get_node_or_null("OverlayTitle") as Label
+	if ot:
+		ot.text = "ANTE %s   ·   HAND %d / %d" % [
+			Constants.rom(GameManager.ante),
+			mini(GameManager.hand, GameManager.max_hand),
+			GameManager.max_hand,
+		]
+	_ov_goal_lbl.text = "%s / %s" % [_fmt(GameManager.chips), _fmt(GameManager.target)]
+	var ratio := clampf(float(GameManager.chips) / float(maxi(GameManager.target, 1)), 0.0, 1.0)
+	_ov_bar_fill.size.x = 900.0 * ratio
 
 func _shake_overlay(intensity: float) -> void:
 	var tw := create_tween()

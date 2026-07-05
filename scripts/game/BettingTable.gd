@@ -159,6 +159,7 @@ func _build() -> void:
 		if ResourceLoader.exists("res://assets/layout/chip_default.png"):
 			chip.texture = load("res://assets/layout/chip_default.png")
 		chip.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		chip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		var zs := _zone_size(zone)
 		var cs := min(min(zs.x, zs.y) * 0.7, 56.0)
 		chip.size = Vector2(cs, cs)
@@ -348,6 +349,26 @@ func get_total_bet() -> int:
 
 func get_bets() -> Dictionary:
 	return bets.duplicate()
+
+# Re-place a previously captured set of bets (REBET & SPIN)
+func restore_bets(saved: Dictionary) -> void:
+	clear_bets()
+	for key in saved:
+		bets[key] = int(saved[key])
+		if key.begins_with("straight_") and _lucky_number < 0:
+			_lucky_number = int(key.trim_prefix("straight_"))
+		var lbl: Label = _chip_labels.get(key)
+		if lbl:
+			lbl.text = str(bets[key])
+			lbl.show()
+		var chip: TextureRect = _chip_sprites.get(key)
+		if chip:
+			chip.show()
+		var glow: ColorRect = _win_glows.get(key)
+		if glow:
+			glow.color = Color(0.788, 0.659, 0.298, 0.18)
+	_refresh_simple_visuals()
+	emit_signal("bet_placed", "", get_total_bet())
 
 func clear_bets() -> void:
 	bets.clear()

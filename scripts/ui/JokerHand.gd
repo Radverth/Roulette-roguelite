@@ -47,6 +47,7 @@ func _build_ui() -> void:
 	if ResourceLoader.exists("res://assets/effects/flame_divider.png"):
 		div.texture = load("res://assets/effects/flame_divider.png")
 	div.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	div.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	div.custom_minimum_size = Vector2(600, 48)
 	div.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	div.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -77,6 +78,7 @@ func _build_ui() -> void:
 	if ResourceLoader.exists("res://assets/effects/flame_divider.png"):
 		div2.texture = load("res://assets/effects/flame_divider.png")
 	div2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	div2.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	div2.custom_minimum_size = Vector2(480, 44)
 	div2.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	div2.modulate.a = 0.7
@@ -135,6 +137,7 @@ func _build_filled_card(card: Dictionary) -> Control:
 		var icon := TextureRect.new()
 		icon.texture = load(icon_path)
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.custom_minimum_size = Vector2(80, 80)
 		icon.position = Vector2(60, 34)
 		icon.size = Vector2(80, 80)
