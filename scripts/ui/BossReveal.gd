@@ -80,6 +80,7 @@ func _build_ui() -> void:
 	if ResourceLoader.exists("res://assets/effects/devil_watermark.png"):
 		devil_icon.texture = load("res://assets/effects/devil_watermark.png")
 	devil_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	devil_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	devil_icon.custom_minimum_size = Vector2(164, 164)
 	devil_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	devil_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -99,6 +100,7 @@ func _build_ui() -> void:
 	if ResourceLoader.exists("res://assets/effects/flame_divider.png"):
 		div.texture = load("res://assets/effects/flame_divider.png")
 	div.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	div.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	div.custom_minimum_size = Vector2(340, 44)
 	div.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	div.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -15,6 +15,7 @@ func _build_ui() -> void:
 	if ResourceLoader.exists("res://assets/effects/devil_watermark.png"):
 		watermark.texture = load("res://assets/effects/devil_watermark.png")
 	watermark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	watermark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	watermark.set_anchors_preset(Control.PRESET_FULL_RECT)
 	watermark.modulate = Color(0.6, 0.0, 0.0, 0.3)
 	watermark.mouse_filter = Control.MOUSE_FILTER_IGNORE

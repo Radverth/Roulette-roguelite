@@ -192,12 +192,16 @@ func calculate_winnings(bets: Dictionary, winning_number: int) -> int:
 	best_return = _apply_card_bonuses(bets, best_number, best_return)
 	return best_return
 
-# Whether a single bet key pays on this number (boss rules included) —
-# used by the UI to mark wagers PAID/LOST on the result screen.
-func bet_hits(bet_key: String, number: int) -> bool:
+# What a single bet returns (stake included) on this number, boss rules
+# applied — used by the UI to show per-wager payouts on the result screen.
+func bet_return(bet_key: String, amount: int, number: int) -> int:
 	if _boss_id() == "red_pays_nothing" and number in Constants.RED_NUMBERS:
-		return false
-	return _payout_ratio(bet_key, number) > 0
+		return 0
+	var ratio := _payout_ratio(bet_key, number)
+	return amount * (ratio + 1) if ratio > 0 else 0
+
+func bet_hits(bet_key: String, number: int) -> bool:
+	return bet_return(bet_key, 1, number) > 0
 
 func _boss_id() -> String:
 	if not GameManager.is_boss_floor:
