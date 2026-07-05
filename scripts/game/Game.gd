@@ -822,9 +822,9 @@ func _on_rebet_pressed() -> void:
 func _on_overlay_input(event: InputEvent) -> void:
 	if not (_spin_tween and _spin_tween.is_valid() and _spin_tween.is_running()):
 		return
-	var tapped := (event is InputEventMouseButton and event.pressed) \
-		or (event is InputEventScreenTouch and event.pressed)
-	if tapped:
+	# is_pressed() exists on the InputEvent base class; .pressed does not,
+	# and accessing it through a typed InputEvent fails to compile
+	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		_spin_tween.custom_step(30.0)
 
 func _open_spin_overlay(number: int, staked: int) -> void:
