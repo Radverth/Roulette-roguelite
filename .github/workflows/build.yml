@@ -119,6 +119,9 @@ jobs:
           godot --headless --import 2>&1 || true
           echo "Import complete."
 
+      - name: Validate all GDScript compiles
+        run: godot --headless --script res://scripts/ci/validate_scripts.gd
+
       - name: Export APK
         run: |
           godot --headless \
