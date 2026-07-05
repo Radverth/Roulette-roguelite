@@ -12,6 +12,7 @@ var _bar_label: Label
 var _joker_row: HBoxContainer
 var _msg_lbl: Label
 var _staked_lbl: Label
+var _mode_btn: Button
 var _chip_btns: Array[Button] = []
 var _spin_btn: Button
 var _clear_btn: Button
@@ -71,6 +72,8 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_shown_chips = GameManager.chips
 	_build_ui()
+	_table.set_simple_mode(SaveManager.get_setting("simple_betting", true))
+	_update_mode_btn()
 	_connect_signals()
 	_refresh_hud()
 	_refresh_jokers()
@@ -231,21 +234,53 @@ func _build_joker_row() -> Control:
 
 	return section
 
-# ── "Place Your Wager" label ───────────────────────────────────────────────
+# ── "Place Your Wager" label + table-mode toggle ─────────────────────────────
 func _build_wager_label() -> Control:
 	var section := _section(H_LABEL, Color(0, 0, 0, 0))
 
 	var lbl := Label.new()
 	lbl.text = "Place Your Wager"
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	lbl.offset_left = 60.0
 	lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	lbl.add_theme_font_size_override("font_size", 34)
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	section.add_child(lbl)
 
+	_mode_btn = Button.new()
+	_mode_btn.position = Vector2(1080.0 - 60.0 - 260.0, 10.0)
+	_mode_btn.size = Vector2(260, 60)
+	_mode_btn.focus_mode = Control.FOCUS_NONE
+	_mode_btn.add_theme_font_size_override("font_size", 24)
+	_mode_btn.add_theme_color_override("font_color", Constants.COLOR_TEXT)
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(0, 0, 0, 0.35)
+	s.border_color = Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.5)
+	s.set_border_width_all(1)
+	s.set_corner_radius_all(8)
+	_mode_btn.add_theme_stylebox_override("normal", s)
+	_mode_btn.add_theme_stylebox_override("focus", s)
+	var sh := s.duplicate() as StyleBoxFlat
+	sh.bg_color = Color(0, 0, 0, 0.55)
+	_mode_btn.add_theme_stylebox_override("hover", sh)
+	_mode_btn.add_theme_stylebox_override("pressed", sh)
+	_mode_btn.pressed.connect(_on_mode_toggled)
+	section.add_child(_mode_btn)
+
 	return section
+
+func _on_mode_toggled() -> void:
+	AudioManager.play_ui_click()
+	var simple := not _table.is_simple_mode()
+	_table.set_simple_mode(simple)
+	SaveManager.set_setting("simple_betting", simple)
+	_update_mode_btn()
+
+func _update_mode_btn() -> void:
+	# Label shows what tapping switches TO
+	_mode_btn.text = "FULL TABLE" if _table.is_simple_mode() else "EASY BETS"
 
 # ── Betting table ─────────────────────────────────────────────────────────────
 func _build_table_section() -> Control:

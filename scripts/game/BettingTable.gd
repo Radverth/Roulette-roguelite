@@ -11,6 +11,14 @@ var _chip_labels: Dictionary = {}
 var _chip_sprites: Dictionary = {}
 var _win_glows: Dictionary = {}
 
+# Easy-bets layer: big thumb-sized buttons for the common outside bets,
+# toggled against the classic full table. Both write into the same `bets`.
+var _full_layer: Control
+var _simple_layer: Control
+var _simple_labels: Dictionary = {}   # ui_key -> amount Label
+var _lucky_btn: Button
+var _lucky_number: int = -1
+
 # Table display dimensions — must match actual bet_layout.png (1080×600)
 const TABLE_W := 1080.0
 const TABLE_H := 600.0
@@ -83,7 +91,19 @@ var _zones: Array = []
 func _ready() -> void:
 	custom_minimum_size = Vector2(1080, TABLE_H)
 	_zones = _make_zones()
+	_full_layer = Control.new()
+	_full_layer.position = Vector2.ZERO
+	_full_layer.size = Vector2(TABLE_W, TABLE_H)
+	add_child(_full_layer)
 	_build()
+	_build_simple_layer()
+
+func set_simple_mode(simple: bool) -> void:
+	_simple_layer.visible = simple
+	_full_layer.visible = not simple
+
+func is_simple_mode() -> bool:
+	return _simple_layer.visible
 
 func _build() -> void:
 	# Table image background — image is 1080×600, fills full width with no margin
@@ -95,7 +115,7 @@ func _build() -> void:
 	table_img.position = Vector2(0, 0)
 	table_img.size = Vector2(TABLE_W, TABLE_H)
 	table_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(table_img)
+	_full_layer.add_child(table_img)
 
 	# Win-glow layer (behind chips, above table)
 	for zone in _zones:
@@ -105,7 +125,7 @@ func _build() -> void:
 		glow.position = _zone_pos(zone, margin)
 		glow.size = _zone_size(zone)
 		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(glow)
+		_full_layer.add_child(glow)
 		_win_glows[key] = glow
 
 	# Hotspot buttons (transparent, interactive)
@@ -132,7 +152,7 @@ func _build() -> void:
 		btn.add_theme_stylebox_override("pressed", sh)
 
 		btn.pressed.connect(_on_zone_pressed.bind(key))
-		add_child(btn)
+		_full_layer.add_child(btn)
 
 		# Chip sprite per zone
 		var chip := TextureRect.new()
@@ -161,6 +181,123 @@ func _build() -> void:
 		lbl.hide()
 		btn.add_child(lbl)
 		_chip_labels[key] = lbl
+
+# ── Easy-bets layer ──────────────────────────────────────────────────────────
+func _build_simple_layer() -> void:
+	_simple_layer = Control.new()
+	_simple_layer.position = Vector2.ZERO
+	_simple_layer.size = Vector2(TABLE_W, TABLE_H)
+	_simple_layer.hide()
+	add_child(_simple_layer)
+
+	var vbox := VBoxContainer.new()
+	vbox.position = Vector2(40, 4)
+	vbox.size = Vector2(TABLE_W - 80, TABLE_H - 8)
+	vbox.add_theme_constant_override("separation", 12)
+	_simple_layer.add_child(vbox)
+
+	var red_col   := Color(0.545, 0.086, 0.086)
+	var black_col := Color(0.16, 0.15, 0.15)
+	var gold_dim  := Color(Constants.COLOR_GOLD.r, Constants.COLOR_GOLD.g, Constants.COLOR_GOLD.b, 0.55)
+
+	vbox.add_child(_simple_row([
+		_simple_btn("red",   "RED",        "pays 1:1", red_col),
+		_simple_btn("black", "BLACK",      "pays 1:1", black_col),
+	]))
+	vbox.add_child(_simple_row([
+		_simple_btn("odd",   "ODD",        "pays 1:1", gold_dim),
+		_simple_btn("even",  "EVEN",       "pays 1:1", gold_dim),
+	]))
+	vbox.add_child(_simple_row([
+		_simple_btn("low",   "LOW 1-18",   "pays 1:1", gold_dim),
+		_simple_btn("high",  "HIGH 19-36", "pays 1:1", gold_dim),
+	]))
+	vbox.add_child(_simple_row([
+		_simple_btn("dozen1", "1ST 12", "pays 2:1", gold_dim),
+		_simple_btn("dozen2", "2ND 12", "pays 2:1", gold_dim),
+		_simple_btn("dozen3", "3RD 12", "pays 2:1", gold_dim),
+	]))
+	_lucky_btn = _simple_btn("lucky", "LUCKY NUMBER", "tap to draw · pays 35:1", Constants.COLOR_GOLD)
+	vbox.add_child(_simple_row([_lucky_btn]))
+
+func _simple_row(buttons: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.custom_minimum_size = Vector2(0, 102)
+	for btn in buttons:
+		row.add_child(btn)
+	return row
+
+func _simple_btn(ui_key: String, title: String, subtitle: String, accent: Color) -> Button:
+	var btn := Button.new()
+	btn.text = "%s\n%s" % [title, subtitle]
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, 102)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.add_theme_font_size_override("font_size", 28)
+	btn.add_theme_color_override("font_color", Constants.COLOR_TEXT)
+
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(0.07, 0.03, 0.03, 0.92)
+	s.border_color = accent
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(12)
+	btn.add_theme_stylebox_override("normal", s)
+	btn.add_theme_stylebox_override("focus", s)
+	var sh := s.duplicate() as StyleBoxFlat
+	sh.bg_color = sh.bg_color.lightened(0.12)
+	btn.add_theme_stylebox_override("hover", sh)
+	btn.add_theme_stylebox_override("pressed", sh)
+
+	if ui_key == "lucky":
+		btn.pressed.connect(_on_lucky_pressed)
+	else:
+		btn.pressed.connect(_on_zone_pressed.bind(ui_key))
+
+	# Staked-amount badge, right-hand side of the button
+	var amt := Label.new()
+	amt.anchor_left = 1.0
+	amt.anchor_top = 0.0
+	amt.anchor_right = 1.0
+	amt.anchor_bottom = 1.0
+	amt.offset_left = -110.0
+	amt.offset_right = -18.0
+	amt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	amt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	amt.add_theme_color_override("font_color", Constants.COLOR_GOLD)
+	amt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	amt.add_theme_constant_override("outline_size", 6)
+	amt.add_theme_font_size_override("font_size", 26)
+	amt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	amt.hide()
+	btn.add_child(amt)
+	_simple_labels[ui_key] = amt
+
+	return btn
+
+func _on_lucky_pressed() -> void:
+	# First tap draws this spin's lucky number, further taps raise the stake
+	if _lucky_number < 0:
+		_lucky_number = randi() % 37
+	_on_zone_pressed("straight_%d" % _lucky_number)
+
+func _refresh_simple_visuals() -> void:
+	for ui_key in _simple_labels:
+		var bet_key: String = ui_key
+		if ui_key == "lucky":
+			if _lucky_number < 0:
+				_simple_labels[ui_key].hide()
+				continue
+			bet_key = "straight_%d" % _lucky_number
+		var amt: int = bets.get(bet_key, 0)
+		var lbl: Label = _simple_labels[ui_key]
+		lbl.text = str(amt)
+		lbl.visible = amt > 0
+	if _lucky_btn:
+		if _lucky_number >= 0:
+			_lucky_btn.text = "LUCKY %d\npays 35:1" % _lucky_number
+		else:
+			_lucky_btn.text = "LUCKY NUMBER\ntap to draw · pays 35:1"
 
 func _zone_pos(zone: Array, margin: float) -> Vector2:
 	var cx: float = zone[1]; var cy: float = zone[2]
@@ -194,6 +331,7 @@ func _on_zone_pressed(key: String) -> void:
 	var glow: ColorRect = _win_glows.get(key)
 	if glow:
 		glow.color = Color(0.788, 0.659, 0.298, 0.18)
+	_refresh_simple_visuals()
 	emit_signal("bet_placed", key, bets[key])
 
 func set_chip_amount(amount: int) -> void:
@@ -213,6 +351,7 @@ func get_bets() -> Dictionary:
 
 func clear_bets() -> void:
 	bets.clear()
+	_lucky_number = -1
 	for key in _chip_labels:
 		_chip_labels[key].hide()
 		_chip_labels[key].text = ""
@@ -220,6 +359,7 @@ func clear_bets() -> void:
 		_chip_sprites[key].hide()
 	for key in _win_glows:
 		_win_glows[key].color = Color(0.788, 0.659, 0.298, 0.0)
+	_refresh_simple_visuals()
 	emit_signal("bets_cleared")
 
 func show_win_zones(result_number: int) -> void:

@@ -3,9 +3,17 @@ extends Node
 const SAVE_PATH := "user://save_data.json"
 
 var high_scores: Array[Dictionary] = []
+var settings: Dictionary = {}
 
 func _ready() -> void:
 	_load()
+
+func get_setting(key: String, default_value: Variant) -> Variant:
+	return settings.get(key, default_value)
+
+func set_setting(key: String, value: Variant) -> void:
+	settings[key] = value
+	_save()
 
 func save_run(chips: int, floor_num: int) -> void:
 	high_scores.append({"chips": chips, "floor": floor_num, "date": Time.get_date_string_from_system()})
@@ -23,7 +31,7 @@ func has_save() -> bool:
 func _save() -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
-		file.store_string(JSON.stringify({"high_scores": high_scores}))
+		file.store_string(JSON.stringify({"high_scores": high_scores, "settings": settings}))
 		file.close()
 
 func _load() -> void:
@@ -38,3 +46,5 @@ func _load() -> void:
 		high_scores.clear()
 		for entry in data["high_scores"]:
 			high_scores.append({"chips": int(entry.get("chips", 0)), "floor": int(entry.get("floor", 1)), "date": str(entry.get("date", ""))})
+	if data and data.has("settings") and data["settings"] is Dictionary:
+		settings = data["settings"]
