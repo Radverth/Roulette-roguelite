@@ -46,7 +46,7 @@ const LINES: Dictionary = {
 	],
 	"floor_complete": [
 		"You advance. Curious. This was not in my arrangement.",
-		"The ante is met. The shop awaits — spend wisely, if you are able.",
+		"The circle yields. The shop awaits — spend wisely, if you are able.",
 		"Progress! How... unexpected. The wheel and I are quite displeased.",
 		"Another floor falls. Luck or skill? I suspect the former. Deeply.",
 	],
@@ -124,7 +124,11 @@ func _build() -> void:
 
 func say(category: String, auto_hide_secs: float = 3.8) -> void:
 	var pool: Array = LINES.get(category, LINES["game_start"])
-	var line: String = pool[randi() % pool.size()]
+	say_text(pool[randi() % pool.size()], auto_hide_secs)
+
+# Speak a specific line rather than one drawn from a category pool —
+# used for scripted moments like the sin heralds of the descent.
+func say_text(line: String, auto_hide_secs: float = 3.8) -> void:
 	_lbl.text = "[i]\"" + line + "\"[/i]"
 	if _tween:
 		_tween.kill()

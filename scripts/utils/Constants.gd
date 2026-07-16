@@ -55,23 +55,103 @@ const CARD_RARITY_COLORS := {
 	"legendary": Color(0.79, 0.66, 0.30),
 }
 
-# The Seven Deadly Sins — one presides over each ante (cycling in endless mode),
-# granting the player a dark blessing for as long as that ante lasts.
-# Ordered by Dante's ascent: Lust is the shallowest circle, Pride the deepest.
+# The Descent — the run is Dante's Inferno played on a roulette wheel.
+# Each ante is a circle of Hell, and the Devil turns one of the Seven Deadly
+# Sins against you: a curse that corrupts the wheel until the circle is
+# cleared. Ordered by the descent — Lust is the shallowest circle, Pride the
+# deepest of the sins, and the eighth circle is Cocytus, the Devil's own.
+# In endless mode the circles repeat, forever.
+#   curse  — what the sin does to the player, in rules terms
+#   herald — the Devil's announcement as you descend into the circle
+#   lines  — the Devil's taunts while the sin does its work
 const SIN_MODIFIERS: Array[Dictionary] = [
-	{"id": "lust",     "name": "LUST",     "desc": "The reds seduce — red bets pay 50% extra."},
-	{"id": "gluttony", "name": "GLUTTONY", "desc": "Gorge yourself — one extra hand this ante."},
-	{"id": "greed",    "name": "GREED",    "desc": "Insatiable — every winning spin pays 20% extra."},
-	{"id": "sloth",    "name": "SLOTH",    "desc": "Barely trying — losses refund a quarter of your stake."},
-	{"id": "wrath",    "name": "WRATH",    "desc": "Fury rewarded — a win straight after a loss pays double."},
-	{"id": "envy",     "name": "ENVY",     "desc": "Covet thy neighbour — straight bets beside the winning pocket pay 5×."},
-	{"id": "pride",    "name": "PRIDE",    "desc": "Bask in glory — each consecutive win pays 15% more (max +75%)."},
+	{
+		"id": "lust", "name": "LUST",
+		"curse": "The reds seduce and betray — winning red bets pay only half.",
+		"herald": "The first circle, mortal. Desire is the softest chain — see how the red glitters?",
+		"lines": [
+			"You cannot resist the red, can you? Neither could they.",
+			"Desire pays half and takes double. It always has.",
+			"The storm of the lustful howls just for you.",
+		],
+	},
+	{
+		"id": "gluttony", "name": "GLUTTONY",
+		"curse": "Insatiable — the wheel refuses any stake under 50 chips.",
+		"herald": "Deeper now. Here appetite is force-fed — the wheel demands a proper offering.",
+		"lines": [
+			"More. You always crave more.",
+			"Feed the wheel, glutton. It is never full.",
+			"Cerberus ate lighter meals than your stakes.",
+		],
+	},
+	{
+		"id": "greed", "name": "GREED",
+		"curse": "The House hoards — a fifth of every winning spin is taken.",
+		"herald": "Hoarder or spendthrift, it matters not. All gold rolls downhill to me.",
+		"lines": [
+			"Every fifth coin was always mine. Now I collect.",
+			"Count your winnings. I already have.",
+			"You clutch, I harvest.",
+		],
+	},
+	{
+		"id": "sloth", "name": "SLOTH",
+		"curse": "Torpor sets in — one fewer hand to clear this circle.",
+		"herald": "The sullen drown slowly here. Rest, mortal — sleep through your one chance.",
+		"lines": [
+			"Time slips. You let it.",
+			"The idle soul drowns in the mire, gurgling hymns.",
+			"One hand fewer. You would only have wasted it.",
+		],
+	},
+	{
+		"id": "wrath", "name": "WRATH",
+		"curse": "Fury feeds the flames — every total loss burns an extra quarter of your stake.",
+		"herald": "Feel it rising? Good. Your fury is my kindling — every loss will burn hotter.",
+		"lines": [
+			"Strike the table. It only feeds me.",
+			"Rage splendidly, mortal. The wheel drinks it.",
+			"Your losses burn brighter here. I do love a bonfire.",
+		],
+	},
+	{
+		"id": "envy", "name": "ENVY",
+		"curse": "The House covets your boldest wager — your largest bet pays nothing.",
+		"herald": "You covet, mortal. So do I — and what I covet is whatever you prize most.",
+		"lines": [
+			"That precious wager of yours? Mine now.",
+			"Envy eats its own eyes first.",
+			"Spread your coins thin — I still take the fattest stack.",
+		],
+	},
+	{
+		"id": "pride", "name": "PRIDE",
+		"curse": "Pride goeth before the fall — each consecutive win pays 15% less (max −60%).",
+		"herald": "So high, so sure. The proudest fall furthest — and you are almost at the bottom.",
+		"lines": [
+			"Pride was my sin first, little gambler.",
+			"Each triumph hollows the next. Climb on.",
+			"How the mighty stack their chips before the fall.",
+		],
+	},
+	{
+		"id": "treachery", "name": "TREACHERY",
+		"curse": "The Devil's pocket yawns wide — zero strikes twice as often.",
+		"herald": "Cocytus. The lake of ice. Here even the wheel betrays you — every pocket is mine.",
+		"lines": [
+			"Zero again? How strange.",
+			"I do not cheat, mortal. I merely never lose.",
+			"The ice cracks beneath your bets. Listen.",
+			"This is my circle. The wheel remembers its maker.",
+		],
+	},
 ]
 
 const BOSS_MODIFIERS: Array[Dictionary] = [
-	{"id": "red_pays_nothing", "name": "THE CROUPIER",  "desc": "Red numbers pay nothing for the whole ante."},
+	{"id": "red_pays_nothing", "name": "THE CROUPIER",  "desc": "Red numbers pay nothing for the whole circle."},
 	{"id": "house_skim",       "name": "THE COLLECTOR", "desc": "The House skims 10% of your chips after every spin."},
-	{"id": "odds_swap",        "name": "THE MIRROR",    "desc": "Odd and Even swap their payouts until the ante is cleared."},
+	{"id": "odds_swap",        "name": "THE MIRROR",    "desc": "Odd and Even swap their payouts until the circle is cleared."},
 ]
 
 const COLOR_BG      := Color(0.051, 0.051, 0.051)

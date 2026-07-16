@@ -67,7 +67,7 @@ func _build_ui() -> void:
 	# Subtitle
 	var subtitle := Label.new()
 	if _is_victory:
-		subtitle.text = "Ante %s conquered. The Devil tips his hat.\nWalk away rich… or see how deep the parlour goes." % Constants.rom(Constants.WIN_ANTE)
+		subtitle.text = "The lake of ice cracks. Circle %s falls, and you climb out\nto see the stars again… or turn, and descend once more." % Constants.rom(Constants.WIN_ANTE)
 	elif GameManager.run_failed:
 		subtitle.text = "The House demanded %d chips. You fell short.\nYour seat at the table grows cold." % GameManager.target
 	else:
@@ -86,7 +86,7 @@ func _build_ui() -> void:
 	root.add_child(stats_row)
 
 	var reached_ante := GameManager.ante - 1 if _is_victory else GameManager.ante
-	_add_stat_col(stats_row, "CONQUERED" if _is_victory else "REACHED", "Ante %s" % Constants.rom(reached_ante))
+	_add_stat_col(stats_row, "CONQUERED" if _is_victory else "REACHED", "Circle %s" % Constants.rom(reached_ante))
 	stats_row.add_child(_make_stat_divider())
 	_add_stat_col(stats_row, "JOKERS", str(GameManager.owned_cards.size()))
 
@@ -96,7 +96,7 @@ func _build_ui() -> void:
 		best_floor = maxi(best_floor, int(entry.get("floor", 0)))
 	if best_floor > 0:
 		stats_row.add_child(_make_stat_divider())
-		_add_stat_col(stats_row, "BEST", "Ante %s" % Constants.rom(best_floor))
+		_add_stat_col(stats_row, "BEST", "Circle %s" % Constants.rom(best_floor))
 
 	# Spacer
 	var spacer := Control.new()

@@ -28,7 +28,7 @@ func _build_ui() -> void:
 	add_child(center)
 
 	var ante_lbl := Label.new()
-	ante_lbl.text = "ANTE COMPLETE!"
+	ante_lbl.text = "THE DESCENT CONTINUES"
 	ante_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ante_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
 	ante_lbl.add_theme_font_size_override("font_size", 72)
@@ -36,7 +36,7 @@ func _build_ui() -> void:
 	center.add_child(ante_lbl)
 
 	var floor_lbl := Label.new()
-	floor_lbl.text = "Ante %s Complete" % Constants.rom(GameManager.ante - 1)
+	floor_lbl.text = "Circle %s lies behind you" % Constants.rom(GameManager.ante - 1)
 	floor_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	floor_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	floor_lbl.add_theme_font_size_override("font_size", 42)
@@ -53,14 +53,14 @@ func _build_ui() -> void:
 		bounty_lbl.modulate.a = 0.0
 		center.add_child(bounty_lbl)
 
-	# Announce the sin presiding over the ante ahead (GameManager already
-	# advanced the ante, so current_sin belongs to the incoming one)
+	# Announce the circle ahead and the sin the Devil turns against you
+	# (GameManager already advanced the ante, so current_sin is the incoming one)
 	var sin: Dictionary = GameManager.current_sin
 	var sin_lbl: Label = null
 	if not sin.is_empty():
 		sin_lbl = Label.new()
-		sin_lbl.text = "Ante %s bears the sin of %s\n%s" % [
-			Constants.rom(GameManager.ante), sin.name, sin.desc,
+		sin_lbl.text = "Circle %s awaits — the Devil wields %s against you\n%s" % [
+			Constants.rom(GameManager.ante), sin.name, sin.curse,
 		]
 		sin_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sin_lbl.add_theme_color_override("font_color", Color(0.85, 0.45, 0.35))
@@ -102,7 +102,13 @@ func _build_ui() -> void:
 
 	var devil := DevilDialogue.new()
 	add_child(devil)
-	get_tree().create_timer(1.2).timeout.connect(func(): devil.say("floor_complete", 0.0))
+	# The Devil heralds the incoming circle's sin; falls back to his usual
+	# patter if no sin is set (defensive — a run always has one)
+	var herald: String = sin.get("herald", "")
+	if herald != "":
+		get_tree().create_timer(1.2).timeout.connect(func(): devil.say_text(herald, 0.0))
+	else:
+		get_tree().create_timer(1.2).timeout.connect(func(): devil.say("floor_complete", 0.0))
 
 	await get_tree().create_timer(2.8).timeout
 	var fade := create_tween()

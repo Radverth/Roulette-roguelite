@@ -113,12 +113,12 @@ const CARDS: Array[Dictionary] = [
 	},
 	{
 		"id": "loaded_dice", "name": "Loaded Dice", "rarity": "legendary",
-		"desc": "Once per ante, a total loss refunds your full stake.",
+		"desc": "Once per circle, a total loss refunds your full stake.",
 		"icon": "",
 	},
 	{
 		"id": "silent_partner", "name": "Silent Partner", "rarity": "legendary",
-		"desc": "The House's ante bounty is doubled.",
+		"desc": "The House's circle bounty is doubled.",
 		"icon": "",
 	},
 ]
@@ -214,9 +214,27 @@ func _total_bet(bets: Dictionary) -> int:
 		total += int(bets[key])
 	return total
 
+# ENVY: the House covets the player's boldest wager — the largest single bet
+# pays nothing. Ties break on sorted key order so the UI and payout agree.
+func envy_voided_key(bets: Dictionary) -> String:
+	if GameManager.sin_id() != "envy" or bets.is_empty():
+		return ""
+	var keys := bets.keys()
+	keys.sort()
+	var voided := ""
+	var largest := 0
+	for key in keys:
+		if int(bets[key]) > largest:
+			largest = int(bets[key])
+			voided = key
+	return voided
+
 func _base_return(bets: Dictionary, number: int) -> int:
+	var voided := envy_voided_key(bets)
 	var total := 0
 	for bet_key in bets:
+		if bet_key == voided:
+			continue
 		var amount: int = bets[bet_key]
 		var ratio := _payout_ratio(bet_key, number)
 		if ratio > 0:
@@ -271,21 +289,15 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 		if GameManager.has_card("house_edge_reversal") or GameManager.has_card("zero_bounty"):
 			result = max(result, total_bet + 100)
 
-	# Adjacent-pocket payouts (Magnetic Sector card, ENVY sin) pay on straight
-	# bets beside the winning pocket even when nothing else hit — so they run
-	# before loss handling. Both active at once stack.
-	var adjacent_mult := 0
+	# Magnetic Sector pays on straight bets adjacent to the winning pocket,
+	# even when nothing else hit — so it runs before loss handling.
 	if GameManager.has_card("magnetic_sector"):
-		adjacent_mult += 5
-	if GameManager.sin_id() == "envy":
-		adjacent_mult += 5
-	if adjacent_mult > 0:
 		var adj := _adjacent_numbers(number)
 		for bet_key in bets:
 			if bet_key.begins_with("straight_"):
 				var n := int(bet_key.trim_prefix("straight_"))
 				if n in adj:
-					result += int(bets[bet_key]) * adjacent_mult
+					result += int(bets[bet_key]) * 5
 
 	# Loss handling — best protection wins, checked strongest first
 	if result == 0:
@@ -294,19 +306,22 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 			return total_bet
 		if GameManager.has_card("ghost_ball") and randf() < 0.3:
 			return total_bet
-		if GameManager.sin_id() == "sloth":
-			return int(total_bet * 0.25)
 		if GameManager.has_card("insurance_policy"):
 			return int(total_bet * 0.10)
+		# WRATH: with no protection left, a total loss burns an extra quarter
+		# of the stake (a negative payout the game deducts on top of the bets)
+		if GameManager.sin_id() == "wrath":
+			return -(total_bet / 4)
 		return 0
 
 	# Win bonuses (additive)
 	if GameManager.has_card("red_rider") and "red" in bets and _payout_ratio("red", number) > 0:
 		result += int(bets["red"] * 0.5)
 
-	# LUST sin: the reds seduce — red bets pay 50% extra (stacks with Red Rider)
+	# LUST: the reds seduce and betray — winning red bets pay only half
+	# their profit (Red Rider still stacks on top, fighting the curse)
 	if GameManager.sin_id() == "lust" and "red" in bets and _payout_ratio("red", number) > 0:
-		result += int(bets["red"] * 0.5)
+		result -= int(bets["red"] * 0.5)
 
 	if GameManager.has_card("black_rider") and "black" in bets and _payout_ratio("black", number) > 0:
 		result += int(bets["black"] * 0.5)
@@ -344,17 +359,14 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 	if GameManager.has_card("streak_counter"):
 		result = int(result * GameManager.get_streak_multiplier())
 
-	# Sin multipliers — streaks hold their pre-spin values here (see cold_streak
-	# note above), so WRATH pays on the loss-breaking win and PRIDE scales off
-	# the streak being extended
+	# Sin curses on winning spins. win_streak holds its pre-spin value here
+	# (see the cold_streak note above), so PRIDE taxes the win that extends
+	# a streak — momentum itself is the trap.
 	match GameManager.sin_id():
 		"greed":
-			result = int(result * 1.2)
-		"wrath":
-			if GameManager.loss_streak >= 1:
-				result *= 2
+			result = int(result * 0.8)
 		"pride":
-			result = int(result * (1.0 + minf(GameManager.win_streak * 0.15, 0.75)))
+			result = int(result * (1.0 - minf(GameManager.win_streak * 0.15, 0.60)))
 
 	return result
 

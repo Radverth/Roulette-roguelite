@@ -87,6 +87,10 @@ func _ready() -> void:
 	_connect_signals()
 	_refresh_hud()
 	_refresh_jokers()
+	# Entering a fresh circle: the Devil heralds the sin he turns against you
+	var herald: String = GameManager.current_sin.get("herald", "")
+	if GameManager.hand == 1 and herald != "":
+		_msg_lbl.text = "“%s”" % herald
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_ui() -> void:
@@ -127,7 +131,7 @@ func _build_ante_bar() -> Control:
 
 	_ante_lbl = Label.new()
 	var ante_lbl := _ante_lbl
-	ante_lbl.text = "Ante %s" % Constants.rom(GameManager.ante)
+	ante_lbl.text = "Circle %s" % Constants.rom(GameManager.ante)
 	ante_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ante_lbl.offset_bottom = -34.0  # leave room for the sin line beneath
 	ante_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -137,13 +141,13 @@ func _build_ante_bar() -> Control:
 	ante_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(ante_lbl)
 
-	# The reigning sin's blessing, spelled out under the ante title
+	# The reigning sin's curse, spelled out under the circle title
 	_sin_lbl = Label.new()
 	_sin_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_sin_lbl.offset_bottom = -16.0
 	_sin_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sin_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
-	_sin_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
+	_sin_lbl.add_theme_color_override("font_color", Color(0.85, 0.45, 0.35))
 	_sin_lbl.add_theme_font_size_override("font_size", 18)
 	_sin_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(_sin_lbl)
@@ -714,11 +718,11 @@ func _on_ante_changed(ante: int, chips_amount: int, target: int) -> void:
 	# Update ante labels in main and overlay
 	var sin: Dictionary = GameManager.current_sin
 	if _ante_lbl:
-		_ante_lbl.text = "Ante %s" % Constants.rom(ante)
+		_ante_lbl.text = "Circle %s" % Constants.rom(ante)
 		if not sin.is_empty():
 			_ante_lbl.text += "  ·  %s" % sin.name
 	if _sin_lbl:
-		_sin_lbl.text = str(sin.get("desc", ""))
+		_sin_lbl.text = str(sin.get("curse", ""))
 	if _ov_goal_lbl:
 		_update_overlay_header()
 
@@ -793,6 +797,11 @@ func _on_spin_pressed() -> void:
 	if staked > GameManager.chips:
 		_msg_lbl.text = "Not enough chips!"
 		return
+	# GLUTTONY: the wheel refuses a stake it considers a snack
+	var min_stake := GameManager.get_effective_min_bet()
+	if staked < min_stake:
+		_msg_lbl.text = "The wheel demands at least %d chips" % min_stake
+		return
 	_begin_spin()
 
 func _begin_spin() -> void:
@@ -803,6 +812,11 @@ func _begin_spin() -> void:
 	var staked := _table.get_total_bet()
 
 	var number := randi() % 37
+
+	# TREACHERY: the Devil's pocket yawns wide — zero strikes twice as often
+	# (Pocket Blocker below still redirects it: the card fights the curse)
+	if GameManager.sin_id() == "treachery" and number != 0 and randi() % 36 == 0:
+		number = 0
 
 	# pocket_blocker: if 0 lands, redirect to an adjacent pocket
 	if number == 0 and GameManager.has_card("pocket_blocker"):
@@ -976,7 +990,13 @@ func _show_result(number: int, staked: int) -> void:
 	if number == 0 and net <= 0:
 		pool = ZERO_LINES
 
-	_dialogue_lbl.text = pool[randi() % pool.size()]
+	# The reigning sin cuts in on the Devil's patter often enough to keep
+	# the circle's corruption present in his voice
+	var sin_lines: Array = GameManager.current_sin.get("lines", [])
+	if not sin_lines.is_empty() and randf() < 0.35:
+		_dialogue_lbl.text = sin_lines[randi() % sin_lines.size()]
+	else:
+		_dialogue_lbl.text = pool[randi() % pool.size()]
 	_spin_overlay.get_node_or_null("DialogueBox").show()
 	_overlay_msg_lbl.text = outcome_text
 	_overlay_msg_lbl.add_theme_font_size_override("font_size", 46)
@@ -1001,13 +1021,17 @@ func _populate_bets_panel(bets: Dictionary, result_number: int, payout: int) -> 
 		child.queue_free()
 	var keys := bets.keys()
 	keys.sort()
+	var voided := CardManager.envy_voided_key(bets)
 	var base_sum := 0
 	for key in keys:
 		var amount := int(bets[key])
 		var lbl := Label.new()
 		var text := "%s  ·  %s" % [_bet_label(key), _fmt(amount)]
 		var col := Constants.COLOR_TEXT
-		if result_number >= 0:
+		if result_number >= 0 and key == voided:
+			text += "  —  COVETED BY THE HOUSE"
+			col = Color(0.72, 0.30, 0.26)
+		elif result_number >= 0:
 			var ret := CardManager.bet_return(key, amount, result_number)
 			if ret > 0:
 				text += "  →  +%s" % _fmt(ret)
@@ -1052,14 +1076,14 @@ func _continue_label() -> String:
 	if GameManager.run_won:
 		return "THE HOUSE FALLS"
 	if _pending_ante_up:
-		return "ANTE CLEARED"
+		return "DESCEND DEEPER"
 	return "NEXT SPIN"
 
 func _update_overlay_header() -> void:
 	var ot := _spin_overlay.get_node_or_null("OverlayTitle") as Label
 	if ot:
 		var sin_name: String = GameManager.current_sin.get("name", "")
-		var ante_part := "ANTE %s" % Constants.rom(GameManager.ante)
+		var ante_part := "CIRCLE %s" % Constants.rom(GameManager.ante)
 		if sin_name != "":
 			ante_part += "   ·   %s" % sin_name
 		ot.text = "%s   ·   HAND %d / %d" % [

@@ -148,12 +148,14 @@ func on_spin_complete(won: bool) -> void:
 	emit_signal("hand_changed", mini(hand, max_hand), max_hand)
 	emit_signal("ante_changed", ante, chips, target)
 
-# Each ante falls under one of the Seven Deadly Sins, a blessing that lasts
-# until the ante is cleared. GLUTTONY grants its extra hand here; the payout
-# sins are applied in CardManager.
+# Each ante is a circle of the Inferno: the Devil turns one of the Seven
+# Deadly Sins against the player, a curse that lasts until the circle is
+# cleared. SLOTH steals its hand here; the payout curses live in CardManager,
+# GLUTTONY's minimum stake in get_effective_min_bet, TREACHERY's zero pull
+# in Game._begin_spin.
 func _apply_ante_sin() -> void:
 	current_sin = Constants.SIN_MODIFIERS[(ante - 1) % Constants.SIN_MODIFIERS.size()]
-	max_hand = Constants.HANDS_PER_ANTE + (1 if sin_id() == "gluttony" else 0)
+	max_hand = Constants.HANDS_PER_ANTE - (1 if sin_id() == "sloth" else 0)
 
 func sin_id() -> String:
 	return current_sin.get("id", "")
@@ -173,7 +175,9 @@ func get_streak_multiplier() -> float:
 	return 1.0
 
 func get_effective_min_bet() -> int:
-	return 1
+	# GLUTTONY: the wheel refuses any stake under 50 chips — and if the
+	# player holds less than that, it demands everything they have left
+	return mini(50, chips) if sin_id() == "gluttony" else 1
 
 # Legacy helpers kept for CardManager compatibility
 func check_ante_complete() -> bool:

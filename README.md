@@ -1,9 +1,11 @@
 # Velvet Spin — Infernal Roulette Roguelite
 
-A mobile-first roguelite where you gamble against the Devil's roulette wheel.
-Reach the chip target each Ante before your hands run out, buy Joker cards in
-the Velvet Shop between Antes, and survive the boss modifiers the House throws
-at you every third Ante.
+A mobile-first roguelite where you gamble against the Devil's roulette wheel —
+Dante's Inferno played across a betting table. Each Ante is a circle of the
+descent, ruled by one of the Seven Deadly Sins the Devil turns against you.
+Reach the chip target before your hands run out, buy Joker cards in the Velvet
+Shop between circles, and survive the boss modifiers the House throws at you
+every third circle.
 
 Built with **Godot 4.3** (Mobile renderer, 1080×1920 portrait).
 
@@ -19,17 +21,21 @@ Built with **Godot 4.3** (Mobile renderer, 1080×1920 portrait).
 - Between Antes, the Velvet Shop deals three rarity-weighted Jokers but
   reveals them **one at a time**: BUY the card in front of you, or TWIST to
   burn it forever and see the next. No going back — the shop is a gamble too.
-- Conquer **Ante VIII** and the House falls — claim your glory, or descend
-  into **endless mode** and see how deep the parlour goes.
-- Each Ante bears one of the **Seven Deadly Sins** — a dark blessing that
-  tilts the wheel your way until the Ante is cleared (cycling in endless mode):
-  - **LUST** (I) — red bets pay 50% extra.
-  - **GLUTTONY** (II) — one extra hand this Ante.
-  - **GREED** (III) — every winning spin pays 20% extra.
-  - **SLOTH** (IV) — losses refund a quarter of your stake.
-  - **WRATH** (V) — a win straight after a loss pays double.
-  - **ENVY** (VI) — straight bets beside the winning pocket pay 5×.
-  - **PRIDE** (VII) — each consecutive win pays 15% more (max +75%).
+- Survive **Circle VIII** — Cocytus, the Devil's own — and you climb out to
+  see the stars again… or descend into **endless mode**, where the circles
+  repeat forever.
+- Each circle of the descent is ruled by one of the **Seven Deadly Sins**,
+  a curse the Devil turns against you until the circle is cleared:
+  - **LUST** (I) — the reds seduce and betray: winning red bets pay only half.
+  - **GLUTTONY** (II) — the wheel refuses any stake under 50 chips.
+  - **GREED** (III) — the House takes a fifth of every winning spin.
+  - **SLOTH** (IV) — torpor: one fewer hand to clear the circle.
+  - **WRATH** (V) — every total loss burns an extra quarter of your stake.
+  - **ENVY** (VI) — the House covets your boldest wager: your largest bet
+    pays nothing.
+  - **PRIDE** (VII) — each consecutive win pays 15% less (max −60%).
+  - **TREACHERY** (VIII) — the Devil's pocket yawns wide: zero strikes twice
+    as often.
 - Every third Ante is a **Boss Blind** with a house rule that lasts the whole
   Ante:
   - **THE CROUPIER** — red numbers pay nothing.

@@ -139,7 +139,7 @@ func _on_hall_of_infamy() -> void:
 		for i in range(scores.size()):
 			var entry: Dictionary = scores[i]
 			var lbl := Label.new()
-			lbl.text = "%d.  Ante %s  ·  %d chips  ·  %s" % [
+			lbl.text = "%d.  Circle %s  ·  %d chips  ·  %s" % [
 				i + 1,
 				Constants.rom(int(entry.get("floor", 1))),
 				int(entry.get("chips", 0)),
@@ -170,12 +170,12 @@ func _show_howto_dialog() -> void:
 		"VELVET SPIN — Infernal Roulette Roguelite",
 		"",
 		"• Place bets on the roulette table before each spin.",
-		"• Reach the GOAL within %d hands to clear the Ante." % Constants.HANDS_PER_ANTE,
-		"• Clearing an Ante pays a bounty plus interest on your chips.",
-		"• Visit the Velvet Shop between Antes to buy Joker cards.",
-		"• Each Ante bears one of the Seven Deadly Sins — a dark blessing that tilts the wheel your way.",
-		"• Every 3rd Ante is a Boss Blind with a cruel house rule.",
-		"• Conquer Ante %s to beat the House — then go endless." % Constants.rom(Constants.WIN_ANTE),
+		"• Reach the GOAL within %d hands to clear the Circle and descend." % Constants.HANDS_PER_ANTE,
+		"• Clearing a Circle pays a bounty plus interest on your chips.",
+		"• Visit the Velvet Shop between Circles to buy Joker cards.",
+		"• Each Circle of the descent is ruled by one of the Seven Deadly Sins — a curse the Devil turns against you until the Circle is cleared.",
+		"• Every 3rd Circle is a Boss Blind with a cruel house rule on top.",
+		"• Survive Circle %s — TREACHERY, the Devil's own — to escape the Inferno, or go endless." % Constants.rom(Constants.WIN_ANTE),
 		"• Fail the goal or drop below " + str(Constants.GAME_OVER_CHIPS) + " chips and you are RUINED.",
 		"",
 		"BET TYPES:",
