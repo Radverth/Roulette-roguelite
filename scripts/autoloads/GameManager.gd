@@ -22,6 +22,7 @@ var run_won: bool = false
 var endless_mode: bool = false
 var loaded_dice_used: bool = false
 var last_bounty: int = 0
+var current_sin: Dictionary = {}
 
 # Legacy fields kept for card system compatibility
 var floor_number:          int = 1
@@ -58,6 +59,7 @@ func start_new_game() -> void:
 	ante_target   = Constants.STARTING_TARGET
 	floor_number  = 1
 	game_active   = true
+	_apply_ante_sin()
 	emit_signal("chips_changed", chips)
 	emit_signal("hand_changed", hand, max_hand)
 	emit_signal("ante_changed", ante, chips, target)
@@ -134,6 +136,7 @@ func on_spin_complete(won: bool) -> void:
 		ante_progress = 0
 		ante_target   = target
 		loaded_dice_used = false
+		_apply_ante_sin()
 		_pay_ante_bounty()
 		if ante > Constants.WIN_ANTE and not endless_mode:
 			run_won = true
@@ -144,6 +147,16 @@ func on_spin_complete(won: bool) -> void:
 			run_failed = true
 	emit_signal("hand_changed", mini(hand, max_hand), max_hand)
 	emit_signal("ante_changed", ante, chips, target)
+
+# Each ante falls under one of the Seven Deadly Sins, a blessing that lasts
+# until the ante is cleared. GLUTTONY grants its extra hand here; the payout
+# sins are applied in CardManager.
+func _apply_ante_sin() -> void:
+	current_sin = Constants.SIN_MODIFIERS[(ante - 1) % Constants.SIN_MODIFIERS.size()]
+	max_hand = Constants.HANDS_PER_ANTE + (1 if sin_id() == "gluttony" else 0)
+
+func sin_id() -> String:
+	return current_sin.get("id", "")
 
 # The House pays its debts: flat bounty + interest on banked chips
 func _pay_ante_bounty() -> void:

@@ -271,15 +271,21 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 		if GameManager.has_card("house_edge_reversal") or GameManager.has_card("zero_bounty"):
 			result = max(result, total_bet + 100)
 
-	# Magnetic Sector pays on straight bets adjacent to the winning pocket,
-	# even when nothing else hit — so it runs before loss handling.
+	# Adjacent-pocket payouts (Magnetic Sector card, ENVY sin) pay on straight
+	# bets beside the winning pocket even when nothing else hit — so they run
+	# before loss handling. Both active at once stack.
+	var adjacent_mult := 0
 	if GameManager.has_card("magnetic_sector"):
+		adjacent_mult += 5
+	if GameManager.sin_id() == "envy":
+		adjacent_mult += 5
+	if adjacent_mult > 0:
 		var adj := _adjacent_numbers(number)
 		for bet_key in bets:
 			if bet_key.begins_with("straight_"):
 				var n := int(bet_key.trim_prefix("straight_"))
 				if n in adj:
-					result += int(bets[bet_key]) * 5
+					result += int(bets[bet_key]) * adjacent_mult
 
 	# Loss handling — best protection wins, checked strongest first
 	if result == 0:
@@ -288,12 +294,18 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 			return total_bet
 		if GameManager.has_card("ghost_ball") and randf() < 0.3:
 			return total_bet
+		if GameManager.sin_id() == "sloth":
+			return int(total_bet * 0.25)
 		if GameManager.has_card("insurance_policy"):
 			return int(total_bet * 0.10)
 		return 0
 
 	# Win bonuses (additive)
 	if GameManager.has_card("red_rider") and "red" in bets and _payout_ratio("red", number) > 0:
+		result += int(bets["red"] * 0.5)
+
+	# LUST sin: the reds seduce — red bets pay 50% extra (stacks with Red Rider)
+	if GameManager.sin_id() == "lust" and "red" in bets and _payout_ratio("red", number) > 0:
 		result += int(bets["red"] * 0.5)
 
 	if GameManager.has_card("black_rider") and "black" in bets and _payout_ratio("black", number) > 0:
@@ -331,6 +343,18 @@ func _apply_card_bonuses(bets: Dictionary, number: int, base: int) -> int:
 
 	if GameManager.has_card("streak_counter"):
 		result = int(result * GameManager.get_streak_multiplier())
+
+	# Sin multipliers — streaks hold their pre-spin values here (see cold_streak
+	# note above), so WRATH pays on the loss-breaking win and PRIDE scales off
+	# the streak being extended
+	match GameManager.sin_id():
+		"greed":
+			result = int(result * 1.2)
+		"wrath":
+			if GameManager.loss_streak >= 1:
+				result *= 2
+		"pride":
+			result = int(result * (1.0 + minf(GameManager.win_streak * 0.15, 0.75)))
 
 	return result
 

@@ -55,6 +55,19 @@ const CARD_RARITY_COLORS := {
 	"legendary": Color(0.79, 0.66, 0.30),
 }
 
+# The Seven Deadly Sins — one presides over each ante (cycling in endless mode),
+# granting the player a dark blessing for as long as that ante lasts.
+# Ordered by Dante's ascent: Lust is the shallowest circle, Pride the deepest.
+const SIN_MODIFIERS: Array[Dictionary] = [
+	{"id": "lust",     "name": "LUST",     "desc": "The reds seduce — red bets pay 50% extra."},
+	{"id": "gluttony", "name": "GLUTTONY", "desc": "Gorge yourself — one extra hand this ante."},
+	{"id": "greed",    "name": "GREED",    "desc": "Insatiable — every winning spin pays 20% extra."},
+	{"id": "sloth",    "name": "SLOTH",    "desc": "Barely trying — losses refund a quarter of your stake."},
+	{"id": "wrath",    "name": "WRATH",    "desc": "Fury rewarded — a win straight after a loss pays double."},
+	{"id": "envy",     "name": "ENVY",     "desc": "Covet thy neighbour — straight bets beside the winning pocket pay 5×."},
+	{"id": "pride",    "name": "PRIDE",    "desc": "Bask in glory — each consecutive win pays 15% more (max +75%)."},
+]
+
 const BOSS_MODIFIERS: Array[Dictionary] = [
 	{"id": "red_pays_nothing", "name": "THE CROUPIER",  "desc": "Red numbers pay nothing for the whole ante."},
 	{"id": "house_skim",       "name": "THE COLLECTOR", "desc": "The House skims 10% of your chips after every spin."},

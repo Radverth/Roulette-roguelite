@@ -173,6 +173,7 @@ func _show_howto_dialog() -> void:
 		"• Reach the GOAL within %d hands to clear the Ante." % Constants.HANDS_PER_ANTE,
 		"• Clearing an Ante pays a bounty plus interest on your chips.",
 		"• Visit the Velvet Shop between Antes to buy Joker cards.",
+		"• Each Ante bears one of the Seven Deadly Sins — a dark blessing that tilts the wheel your way.",
 		"• Every 3rd Ante is a Boss Blind with a cruel house rule.",
 		"• Conquer Ante %s to beat the House — then go endless." % Constants.rom(Constants.WIN_ANTE),
 		"• Fail the goal or drop below " + str(Constants.GAME_OVER_CHIPS) + " chips and you are RUINED.",

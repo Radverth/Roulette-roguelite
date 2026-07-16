@@ -21,6 +21,15 @@ Built with **Godot 4.3** (Mobile renderer, 1080×1920 portrait).
   burn it forever and see the next. No going back — the shop is a gamble too.
 - Conquer **Ante VIII** and the House falls — claim your glory, or descend
   into **endless mode** and see how deep the parlour goes.
+- Each Ante bears one of the **Seven Deadly Sins** — a dark blessing that
+  tilts the wheel your way until the Ante is cleared (cycling in endless mode):
+  - **LUST** (I) — red bets pay 50% extra.
+  - **GLUTTONY** (II) — one extra hand this Ante.
+  - **GREED** (III) — every winning spin pays 20% extra.
+  - **SLOTH** (IV) — losses refund a quarter of your stake.
+  - **WRATH** (V) — a win straight after a loss pays double.
+  - **ENVY** (VI) — straight bets beside the winning pocket pay 5×.
+  - **PRIDE** (VII) — each consecutive win pays 15% more (max +75%).
 - Every third Ante is a **Boss Blind** with a house rule that lasts the whole
   Ante:
   - **THE CROUPIER** — red numbers pay nothing.

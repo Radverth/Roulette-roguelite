@@ -3,6 +3,7 @@ extends Control
 # ── UI refs ─────────────────────────────────────────────────────────────────
 var _table: BettingTable
 var _ante_lbl: Label
+var _sin_lbl: Label
 var _chips_lbl: Label
 var _hand_lbl: Label
 var _goal_lbl: Label
@@ -128,12 +129,24 @@ func _build_ante_bar() -> Control:
 	var ante_lbl := _ante_lbl
 	ante_lbl.text = "Ante %s" % Constants.rom(GameManager.ante)
 	ante_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ante_lbl.offset_bottom = -34.0  # leave room for the sin line beneath
 	ante_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ante_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
 	ante_lbl.add_theme_color_override("font_color", Constants.COLOR_TEXT)
 	ante_lbl.add_theme_font_size_override("font_size", 26)
 	ante_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(ante_lbl)
+
+	# The reigning sin's blessing, spelled out under the ante title
+	_sin_lbl = Label.new()
+	_sin_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sin_lbl.offset_bottom = -16.0
+	_sin_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sin_lbl.vertical_alignment   = VERTICAL_ALIGNMENT_BOTTOM
+	_sin_lbl.add_theme_color_override("font_color", Constants.COLOR_GOLD)
+	_sin_lbl.add_theme_font_size_override("font_size", 18)
+	_sin_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(_sin_lbl)
 
 	# Gold bottom separator
 	var sep := ColorRect.new()
@@ -699,8 +712,13 @@ func _on_hand_changed(hand: int, max_hand: int) -> void:
 func _on_ante_changed(ante: int, chips_amount: int, target: int) -> void:
 	_goal_lbl.text = "GOAL %s" % _fmt(target)
 	# Update ante labels in main and overlay
+	var sin: Dictionary = GameManager.current_sin
 	if _ante_lbl:
 		_ante_lbl.text = "Ante %s" % Constants.rom(ante)
+		if not sin.is_empty():
+			_ante_lbl.text += "  ·  %s" % sin.name
+	if _sin_lbl:
+		_sin_lbl.text = str(sin.get("desc", ""))
 	if _ov_goal_lbl:
 		_update_overlay_header()
 
@@ -1040,8 +1058,12 @@ func _continue_label() -> String:
 func _update_overlay_header() -> void:
 	var ot := _spin_overlay.get_node_or_null("OverlayTitle") as Label
 	if ot:
-		ot.text = "ANTE %s   ·   HAND %d / %d" % [
-			Constants.rom(GameManager.ante),
+		var sin_name: String = GameManager.current_sin.get("name", "")
+		var ante_part := "ANTE %s" % Constants.rom(GameManager.ante)
+		if sin_name != "":
+			ante_part += "   ·   %s" % sin_name
+		ot.text = "%s   ·   HAND %d / %d" % [
+			ante_part,
 			mini(GameManager.hand, GameManager.max_hand),
 			GameManager.max_hand,
 		]

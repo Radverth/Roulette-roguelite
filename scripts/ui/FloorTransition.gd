@@ -53,6 +53,21 @@ func _build_ui() -> void:
 		bounty_lbl.modulate.a = 0.0
 		center.add_child(bounty_lbl)
 
+	# Announce the sin presiding over the ante ahead (GameManager already
+	# advanced the ante, so current_sin belongs to the incoming one)
+	var sin: Dictionary = GameManager.current_sin
+	var sin_lbl: Label = null
+	if not sin.is_empty():
+		sin_lbl = Label.new()
+		sin_lbl.text = "Ante %s bears the sin of %s\n%s" % [
+			Constants.rom(GameManager.ante), sin.name, sin.desc,
+		]
+		sin_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sin_lbl.add_theme_color_override("font_color", Color(0.85, 0.45, 0.35))
+		sin_lbl.add_theme_font_size_override("font_size", 30)
+		sin_lbl.modulate.a = 0.0
+		center.add_child(sin_lbl)
+
 	var div := TextureRect.new()
 	if ResourceLoader.exists("res://assets/effects/flame_divider.png"):
 		div.texture = load("res://assets/effects/flame_divider.png")
@@ -80,6 +95,8 @@ func _build_ui() -> void:
 	tween.tween_property(floor_lbl,    "modulate:a", 1.0, 0.7).set_delay(0.3)
 	if bounty_lbl:
 		tween.tween_property(bounty_lbl, "modulate:a", 1.0, 0.7).set_delay(0.5)
+	if sin_lbl:
+		tween.tween_property(sin_lbl,    "modulate:a", 1.0, 0.7).set_delay(0.7)
 	tween.tween_property(div,          "modulate:a", 1.0, 0.7).set_delay(0.6)
 	tween.tween_property(entering_lbl, "modulate:a", 1.0, 0.7).set_delay(0.9)
 
