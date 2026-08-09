@@ -16,6 +16,7 @@ namespace SinWheel
         public SaveSystem Save;
         public AnalyticsSystem Analytics;
         public UpgradeSystem Upgrades;
+        public NarrativeSystem Narrative;
 
         public HealthSystem Health;
         public CurrencySystem Wallet;

@@ -13,6 +13,7 @@ namespace SinWheel
 
         public bool RunActive { get; private set; }
         public int SpinsThisRun;
+        private bool _greedNoticedThisRun;
 
         public GameManager(GameContext ctx)
         {
@@ -28,17 +29,33 @@ namespace SinWheel
             _ctx.Bosses.ResetForRun();
             _ctx.Spin.ResetForRun();
             SpinsThisRun = 0;
+            _greedNoticedThisRun = false;
             RunActive = true;
 
             _ctx.Analytics.Track("run_start", "level", _ctx.Xp.Level);
             _ctx.Hud?.OnRunStarted();
+
+            // The Croupier speaks at run start and run end, nowhere else.
+            _ctx.Hud?.ShowSpeech("croupier", _ctx.Narrative.RunStartLine());
         }
 
         /// <summary>Called by SpinSystem after every resolved spin.</summary>
         public void AfterSpinResolved()
         {
             if (RunActive && _ctx.Health.IsDead)
+            {
                 EndRun(banked: false, bankedAmount: 0);
+                return;
+            }
+
+            // Reactive: a long unbanked streak earns approval from the wrong quarter.
+            if (RunActive && !_greedNoticedThisRun && SpinsThisRun == 15 && _ctx.Wallet.RunCoins > 0)
+            {
+                _greedNoticedThisRun = true;
+                var line = _ctx.Narrative.Reactive?.never_banked_this_run;
+                if (line != null)
+                    _ctx.Hud?.ShowSpeech(line.speaker, line.line);
+            }
         }
 
         public void BankAndEndRun()
@@ -49,6 +66,22 @@ namespace SinWheel
             if (banked > _ctx.Save.Data.bestSingleBank)
                 _ctx.Save.Data.bestSingleBank = banked;
 
+            // Reactive: banking the moment the wheel warms up, three runs running.
+            if (SpinsThisRun <= 3)
+            {
+                _ctx.Save.Data.consecutiveInstantBanks++;
+                if (_ctx.Save.Data.consecutiveInstantBanks >= 3)
+                {
+                    var line = _ctx.Narrative.Reactive?.banked_instantly_thrice;
+                    if (line != null) _ctx.Narrative.SetRunEndQuote(line.line, 3);
+                    _ctx.Save.Data.consecutiveInstantBanks = 0;
+                }
+            }
+            else
+            {
+                _ctx.Save.Data.consecutiveInstantBanks = 0;
+            }
+
             _ctx.Analytics.Track("bank", "amount", banked, "spins", SpinsThisRun);
             EndRun(banked: true, bankedAmount: banked);
         }
@@ -56,9 +89,13 @@ namespace SinWheel
         private void EndRun(bool banked, int bankedAmount)
         {
             RunActive = false;
+            int purseAtEnd = banked ? bankedAmount : _ctx.Wallet.RunCoins;
 
             // Boss drop-off is the metric the sin difficulty curve is tuned on.
+            // A fled sin may claim the ledger quote (priority 2) before the
+            // Croupier's bookend (priority 1) is offered.
             _ctx.Bosses.AbandonEncounter(banked ? "banked_out" : "died");
+            _ctx.Narrative.ChooseRunEndQuote(banked, purseAtEnd);
 
             if (!banked)
                 _ctx.Wallet.ResetRun(); // unbanked winnings are forfeit

@@ -102,7 +102,13 @@ namespace SinWheel
                 button.colors = colors;
             }
 
-            labelText = PixelText.Create(rt, "Label", label, Palette.Bone, scale, PxAlign.Center);
+            // Shrink the label scale until the text fits inside the button
+            // (6px advance per glyph, 8px of horizontal padding).
+            int labelScale = scale;
+            while (labelScale > 1 && (label?.Length ?? 0) * 6 * labelScale > 48 * scale - 8)
+                labelScale--;
+
+            labelText = PixelText.Create(rt, "Label", label, Palette.Bone, labelScale, PxAlign.Center);
             Place((RectTransform)labelText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
 
             if (onClick != null)
@@ -134,6 +140,55 @@ namespace SinWheel
         public static void SetPixelBarFill(Image fill, float normalized)
         {
             fill.fillAmount = Mathf.Round(Mathf.Clamp01(normalized) * 64f) / 64f;
+        }
+
+        /// <summary>Slider built from the authored bar track/fill and a 16px handle.</summary>
+        public static Slider CreatePixelSlider(Transform parent, string name, Vector2 anchor, Vector2 pos,
+            float initial, Action<float> onChanged)
+        {
+            var root = CreateRect(parent, name);
+            Place(root, anchor, pos, new Vector2(64f, 16f));
+
+            var bg = CreateRect(root, "Background");
+            Place(bg, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64f, 8f));
+            var bgImg = bg.gameObject.AddComponent<Image>();
+            bgImg.sprite = ArtSprites.Get("UI/bar_track");
+            bgImg.raycastTarget = false;
+
+            var fillArea = CreateRect(root, "Fill Area");
+            fillArea.anchorMin = new Vector2(0f, 0.5f);
+            fillArea.anchorMax = new Vector2(1f, 0.5f);
+            fillArea.offsetMin = new Vector2(1f, -4f);
+            fillArea.offsetMax = new Vector2(-1f, 4f);
+
+            var fill = CreateRect(fillArea, "Fill");
+            Stretch(fill, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var fillImg = fill.gameObject.AddComponent<Image>();
+            fillImg.sprite = ArtSprites.Get("UI/bar_fill_xp");
+            fillImg.raycastTarget = false;
+
+            var handleArea = CreateRect(root, "Handle Slide Area");
+            handleArea.anchorMin = new Vector2(0f, 0.5f);
+            handleArea.anchorMax = new Vector2(1f, 0.5f);
+            handleArea.offsetMin = new Vector2(4f, -8f);
+            handleArea.offsetMax = new Vector2(-4f, 8f);
+
+            var handle = CreateRect(handleArea, "Handle");
+            handle.sizeDelta = new Vector2(16f, 16f);
+            var handleImg = handle.gameObject.AddComponent<Image>();
+            handleImg.sprite = ArtSprites.Get("Icons/ui_spin_charge");
+
+            var slider = root.gameObject.AddComponent<Slider>();
+            slider.fillRect = fill;
+            slider.handleRect = handle;
+            slider.targetGraphic = handleImg;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = Mathf.Clamp01(initial);
+            if (onChanged != null)
+                slider.onValueChanged.AddListener(v => onChanged(v));
+            return slider;
         }
     }
 }

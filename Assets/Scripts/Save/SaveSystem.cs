@@ -12,6 +12,13 @@ namespace SinWheel
         public int tier;
     }
 
+    [Serializable]
+    public class CountEntry
+    {
+        public string id;
+        public int count;
+    }
+
     /// <summary>Everything that persists across runs. Serialized with JsonUtility.</summary>
     [Serializable]
     public class SaveData
@@ -26,6 +33,30 @@ namespace SinWheel
         public int bestSingleBank;
         public List<UpgradeTierEntry> upgradeTiers = new List<UpgradeTierEntry>();
         public long lastSaveUnix;
+
+        // Narrative + settings
+        public float musicVolume = Music.DefaultVolume;
+        public int consecutiveInstantBanks;
+        public List<CountEntry> sinEncounters = new List<CountEntry>();
+        public List<CountEntry> sinDefeats = new List<CountEntry>();
+        public List<string> unlockedFragments = new List<string>();
+
+        public static int GetCount(List<CountEntry> list, string id)
+        {
+            foreach (var e in list)
+                if (e.id == id) return e.count;
+            return 0;
+        }
+
+        public static int IncrementCount(List<CountEntry> list, string id)
+        {
+            foreach (var e in list)
+            {
+                if (e.id == id) return ++e.count;
+            }
+            list.Add(new CountEntry { id = id, count = 1 });
+            return 1;
+        }
 
         public int GetUpgradeTier(string id)
         {

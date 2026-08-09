@@ -92,6 +92,9 @@ namespace SinWheel
             };
             _summonChance = _ctx.Config.Tuning.sinSummonBaseChance;
 
+            int visits = SaveData.IncrementCount(_ctx.Save.Data.sinEncounters, cfg.id);
+            _ctx.Narrative.BeginEncounter(cfg.id, visits >= 3);
+
             _ctx.Analytics.Track("boss_encounter_start", "sin", cfg.id, "player_level", _ctx.Xp.Level);
             _ctx.Hud?.OnBossStarted(Encounter);
             Sfx.Boss();
@@ -130,17 +133,39 @@ namespace SinWheel
             Encounter.Modifier.OnSpinResolved(Encounter);
 
             if (Encounter.Modifier.IsDefeated(Encounter))
+            {
                 EndEncounter(defeated: true);
-            else if (Encounter.SpinsRemaining <= 0)
+                return;
+            }
+            if (Encounter.SpinsRemaining <= 0)
+            {
                 EndEncounter(defeated: false);
-            else
-                _ctx.Hud?.OnBossUpdated(Encounter);
+                return;
+            }
+
+            _ctx.Hud?.OnBossUpdated(Encounter);
+
+            // The encounter has a middle: an occasional taunt, drawn without
+            // replacement so nothing repeats within one visit.
+            if (Encounter.SpinsElapsed >= 2 && Encounter.SpinsElapsed % 3 == 0
+                && _ctx.Rng.NextDouble() < 0.6)
+            {
+                string taunt = _ctx.Narrative.NextTaunt();
+                if (taunt != null)
+                    _ctx.Hud?.ShowSpeech(Encounter.Config.id, taunt);
+            }
         }
 
         /// <summary>Run died or banked out while a sin was active — log the drop-off.</summary>
         public void AbandonEncounter(string reason)
         {
             if (!EncounterActive) return;
+
+            // A fled sin gets the last word on the ledger screen.
+            if (reason == "banked_out")
+                _ctx.Narrative.SetRunEndQuote(
+                    _ctx.Narrative.EncounterEndLine(Encounter.Config.id, "player_fled"), 2);
+
             _ctx.Analytics.Track("boss_encounter_end",
                 "sin", Encounter.Config.id, "outcome", reason, "spins", Encounter.SpinsElapsed);
             Encounter = null;
@@ -157,12 +182,26 @@ namespace SinWheel
                 _ctx.Wallet.AddRunCoins(cfg.defeatCoins);
                 _ctx.Wallet.AddGems(cfg.defeatGems);
                 _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} REPENTS +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
+
+                // Fragments: defeat a sin three times, learn a little of why
+                // you are at the wheel. Delivered on the ledger, never mid-run.
+                int defeats = SaveData.IncrementCount(_ctx.Save.Data.sinDefeats, cfg.id);
+                string fragKey = cfg.id + "_3";
+                if (defeats >= 3 && !_ctx.Save.Data.unlockedFragments.Contains(fragKey))
+                {
+                    _ctx.Save.Data.unlockedFragments.Add(fragKey);
+                    _ctx.Narrative.SetPendingFragment(_ctx.Narrative.FragmentFor(cfg.id));
+                    _ctx.Analytics.Track("fragment_unlocked", "sin", cfg.id);
+                }
             }
             else
             {
                 _ctx.Wallet.AddRunCoins(cfg.surviveCoins);
                 _ctx.Hud?.Toast($"OUTLASTED {cfg.displayName.ToUpperInvariant()} +{cfg.surviveCoins}C", Palette.Bone);
             }
+
+            _ctx.Hud?.ShowSpeech(cfg.id,
+                _ctx.Narrative.EncounterEndLine(cfg.id, defeated ? "defeated" : "expired"));
 
             _ctx.Analytics.Track("boss_encounter_end",
                 "sin", cfg.id, "outcome", defeated ? "defeated" : "survived", "spins", spins);
