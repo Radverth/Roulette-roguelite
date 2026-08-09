@@ -21,6 +21,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write # publish the APK as a GitHub Release on main builds
+
 jobs:
   build-android:
     name: Build Android APK
@@ -69,3 +72,17 @@ jobs:
           path: build/Android
           if-no-files-found: error
           retention-days: 14
+
+      # Publish the APK to the repo's Releases page so it's downloadable
+      # without digging into workflow runs. One release per main build.
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Sin Wheel build ${{ github.run_number }}
+          body: |
+            Debug-signed Android APK built from ${{ github.sha }}.
+            Install: download `SinWheel.apk` below, allow installs from unknown sources, open it.
+          files: build/Android/SinWheel.apk
+          fail_on_unmatched_files: true
