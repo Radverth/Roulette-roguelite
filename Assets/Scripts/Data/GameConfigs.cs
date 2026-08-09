@@ -29,6 +29,7 @@ namespace SinWheel
         public float weight;
         public float amount;
         public string colorHex;
+        public string icon; // optional sprite under Art/Icons; falls back to type default
 
         public SegmentType ParsedType
         {
@@ -54,7 +55,7 @@ namespace SinWheel
             return new SegmentConfig
             {
                 id = id, type = type, label = label,
-                weight = weight, amount = amount, colorHex = colorHex
+                weight = weight, amount = amount, colorHex = colorHex, icon = icon
             };
         }
     }

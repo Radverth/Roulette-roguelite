@@ -83,7 +83,8 @@ namespace SinWheel
 
         public override string StatusText(BossEncounter encounter)
         {
-            return $"RESIST {encounter.Resist}/{Cfg.resistThreshold}  ·  {encounter.SpinsRemaining} SPINS REMAIN";
+            // 5x7 font charset only — no parens or middots in UI strings.
+            return $"RESIST {encounter.Resist}/{Cfg.resistThreshold} - {encounter.SpinsRemaining} LEFT";
         }
     }
 

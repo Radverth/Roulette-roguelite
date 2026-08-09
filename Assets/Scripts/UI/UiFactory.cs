@@ -5,24 +5,13 @@ using UnityEngine.UI;
 namespace SinWheel
 {
     /// <summary>
-    /// The whole HUD is built from code — no prefabs, no binary assets — so the
-    /// vertical slice stays reviewable as plain text. These helpers keep
-    /// HudController readable.
+    /// Builders for the pixel-art UI. Everything is laid out in "virtual
+    /// pixels" (1 canvas unit = 1 art pixel); the canvas scales that grid by an
+    /// integer factor so the pixel art stays crisp. No prefabs, no binary scene
+    /// assets — the HUD stays reviewable as code.
     /// </summary>
     public static class UiFactory
     {
-        private static Font _font;
-
-        public static Font DefaultFont
-        {
-            get
-            {
-                if (_font == null)
-                    _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                return _font;
-            }
-        }
-
         public static RectTransform CreateRect(Transform parent, string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -55,55 +44,96 @@ namespace SinWheel
             rt.sizeDelta = size;
         }
 
-        public static Text CreateText(Transform parent, string name, string content, int size, Color color,
-            TextAnchor align = TextAnchor.MiddleCenter, FontStyle style = FontStyle.Bold)
+        // --- Pixel-art widgets ---
+
+        public static Image CreateSpriteImage(Transform parent, string name, string artPath, Vector2 size)
         {
             var rt = CreateRect(parent, name);
-            var text = rt.gameObject.AddComponent<Text>();
-            text.font = DefaultFont;
-            text.text = content;
-            text.fontSize = size;
-            text.fontStyle = style;
-            text.color = color;
-            text.alignment = align;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.raycastTarget = false;
-            return text;
+            var img = rt.gameObject.AddComponent<Image>();
+            if (!string.IsNullOrEmpty(artPath))
+                img.sprite = ArtSprites.Get(artPath);
+            img.raycastTarget = false;
+            rt.sizeDelta = size;
+            return img;
         }
 
-        public static Button CreateButton(Transform parent, string name, string label, Color bg, Color textColor,
-            int fontSize, Action onClick)
+        /// <summary>9-slice panel (panel/panel_danger have 8px borders in their import).</summary>
+        public static Image CreateNineSlice(Transform parent, string name, string artPath)
         {
-            var rt = CreatePanel(parent, name, bg);
+            var rt = CreateRect(parent, name);
+            var img = rt.gameObject.AddComponent<Image>();
+            img.sprite = ArtSprites.Get(artPath);
+            img.type = Image.Type.Sliced;
+            return img;
+        }
+
+        /// <summary>
+        /// Sprite button. Primary buttons swap idle/pressed/disabled sprites;
+        /// secondary has one sprite and tints. Native size is 48x16, scaled by
+        /// an integer factor to keep the grid.
+        /// </summary>
+        public static Button CreatePixelButton(Transform parent, string name, string label, bool primary,
+            int scale, Action onClick, out PixelText labelText)
+        {
+            var rt = CreateRect(parent, name);
+            rt.sizeDelta = new Vector2(48 * scale, 16 * scale);
+
+            var img = rt.gameObject.AddComponent<Image>();
             var button = rt.gameObject.AddComponent<Button>();
-            button.targetGraphic = rt.GetComponent<Image>();
+            button.targetGraphic = img;
 
-            var colors = button.colors;
-            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-            colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
-            button.colors = colors;
+            if (primary)
+            {
+                img.sprite = ArtSprites.Get("UI/button_primary_idle");
+                button.transition = Selectable.Transition.SpriteSwap;
+                button.spriteState = new SpriteState
+                {
+                    pressedSprite = ArtSprites.Get("UI/button_primary_pressed"),
+                    selectedSprite = ArtSprites.Get("UI/button_primary_idle"),
+                    disabledSprite = ArtSprites.Get("UI/button_primary_disabled")
+                };
+            }
+            else
+            {
+                img.sprite = ArtSprites.Get("UI/button_secondary_idle");
+                var colors = button.colors;
+                colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+                colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+                button.colors = colors;
+            }
 
-            var text = CreateText(rt, "Label", label, fontSize, textColor);
-            Stretch((RectTransform)text.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            labelText = PixelText.Create(rt, "Label", label, Palette.Bone, scale, PxAlign.Center);
+            Place((RectTransform)labelText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
 
             if (onClick != null)
                 button.onClick.AddListener(() => onClick());
             return button;
         }
 
-        /// <summary>Horizontal meter. Returns the fill rect; set fill with SetBarFill.</summary>
-        public static RectTransform CreateBar(Transform parent, string name, Color background, Color fill)
+        /// <summary>Bar with the authored 64x8 track; returns the fill Image (type Filled).</summary>
+        public static Image CreatePixelBar(Transform parent, string name, string fillArtPath, Vector2 anchor, Vector2 pos)
         {
-            var bgRt = CreatePanel(parent, name, background);
-            var fillRt = CreatePanel(bgRt, "Fill", fill);
-            Stretch(fillRt, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            return fillRt;
+            var track = CreateRect(parent, name);
+            Place(track, anchor, pos, new Vector2(64f, 8f));
+            var trackImg = track.gameObject.AddComponent<Image>();
+            trackImg.sprite = ArtSprites.Get("UI/bar_track");
+            trackImg.raycastTarget = false;
+
+            var fill = CreateRect(track, "Fill");
+            Stretch(fill, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var fillImg = fill.gameObject.AddComponent<Image>();
+            fillImg.sprite = ArtSprites.Get(fillArtPath);
+            fillImg.type = Image.Type.Filled;
+            fillImg.fillMethod = Image.FillMethod.Horizontal;
+            fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fillImg.raycastTarget = false;
+            return fillImg;
         }
 
-        public static void SetBarFill(RectTransform fill, float normalized)
+        /// <summary>Snap fill to whole track pixels so the bar edge stays on the grid.</summary>
+        public static void SetPixelBarFill(Image fill, float normalized)
         {
-            fill.anchorMax = new Vector2(Mathf.Clamp01(normalized), 1f);
+            fill.fillAmount = Mathf.Round(Mathf.Clamp01(normalized) * 64f) / 64f;
         }
     }
 }
