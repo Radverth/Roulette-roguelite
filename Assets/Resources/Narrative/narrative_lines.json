@@ -1,0 +1,155 @@
+{
+  "_note": "Voice lines. Each sin speaks only about itself and only in its own register. No line ever explains a mechanic - the boss card already does that. Lines are picked without replacement until the pool exhausts, so a player never hears the same taunt twice in one encounter.",
+
+  "croupier": {
+    "first_ever": ["Sit. You have not been here before. You will be again."],
+    "run_start": [
+      "Again. Sit. You know the terms.",
+      "The wheel does not remember you. I do.",
+      "Back so soon. The ledger is where you left it.",
+      "Nothing has changed. Sit."
+    ],
+    "run_start_late": [
+      "Run forty. I have stopped counting aloud.",
+      "You are further in than when you started. That is usual.",
+      "Most stop by now. You are not most."
+    ],
+    "bank": [
+      "Wise. The house notes it.",
+      "Paid. Not settled, but paid.",
+      "You leave with something. That is rarer than you think.",
+      "The ledger moves. Barely. But it moves."
+    ],
+    "bust": [
+      "The house keeps what the house is owed.",
+      "You were told the terms.",
+      "It was never yours to carry out.",
+      "Nothing. Again."
+    ],
+    "bust_deep": [
+      "You had it. You wanted more of it.",
+      "One more spin. Always one more spin."
+    ]
+  },
+
+  "pride": {
+    "arrival": ["Look how well you were doing."],
+    "taunt": [
+      "You had begun to think this was skill.",
+      "Say it. Say you deserved the last one.",
+      "Smaller now, aren't they."
+    ],
+    "humility_progress": ["One.", "Two. Do not look at me.", ""],
+    "defeated": ["You lowered your eyes. Fine."],
+    "expired": ["I have seen enough of you."],
+    "player_fled": ["Leaving? While ahead? That is almost humble."]
+  },
+
+  "greed": {
+    "arrival": ["A third. That is all. A third of everything."],
+    "taunt": [
+      "You have not stopped. I did not expect you to.",
+      "It is all still here. In the pile. Behind me.",
+      "A third of a great deal is a great deal."
+    ],
+    "defeated": ["Take it. You will bring it back."],
+    "expired": ["Keep the rest. For now."],
+    "player_fled": ["You left the pile. Nobody leaves the pile."]
+  },
+
+  "wrath": {
+    "arrival": ["I have opened the wheel wider for you."],
+    "taunt": [
+      "More room now. Do you feel it.",
+      "Spin. I have made it interesting.",
+      "You are still here. Good."
+    ],
+    "defeated": ["Enough."],
+    "expired": ["I close it again. Not far."],
+    "player_fled": ["Coward. Sensible. Both."]
+  },
+
+  "envy": {
+    "arrival": ["Whatever you love most, I have already copied."],
+    "taunt": [
+      "You keep going back to it. I noticed.",
+      "It is thinner now, isn't it.",
+      "I only wanted what you had."
+    ],
+    "defeated": ["Keep it. It was never as good as it looked."],
+    "expired": ["I have what I came for."],
+    "player_fled": ["Take it with you. I have a copy."]
+  },
+
+  "lust": {
+    "arrival": ["Nothing is where you left it."],
+    "taunt": [
+      "You were counting. Start again.",
+      "There. And there. And not there.",
+      "You had a system. Past tense."
+    ],
+    "defeated": ["Put it back how you found it, then."],
+    "expired": ["I leave it as I found it. Roughly."],
+    "player_fled": ["You never learned the board anyway."]
+  },
+
+  "gluttony": {
+    "arrival": ["You have carried that long enough. Set it down."],
+    "taunt": [
+      "A little more. You will not miss it.",
+      "Heavier than when you came in, isn't it.",
+      "Still holding on. Admirable. Foolish."
+    ],
+    "defeated": ["I am not finished. I am never finished."],
+    "expired": ["That will do. For now."],
+    "player_fled": ["You left with a full purse. I will remember."]
+  },
+
+  "sloth": {
+    "arrival": ["There is no hurry. There never was."],
+    "taunt": [
+      "Take your time. I have all of it.",
+      "You stopped. I felt you stop.",
+      "Again. Slower."
+    ],
+    "defeated": ["Fine. Go quickly then."],
+    "expired": ["You may proceed at your own pace."],
+    "player_fled": ["You waited too long to leave. As always."]
+  },
+
+  "reactive": {
+    "_note": "Fired by behaviour, not by encounter state. This is what makes the wheel feel like it is watching.",
+    "banked_instantly_thrice": {
+      "speaker": "croupier",
+      "line": "You bank the moment I look away. I do not blame you."
+    },
+    "never_banked_this_run": {
+      "speaker": "greed",
+      "line": "You have not banked once. I like you."
+    },
+    "same_sin_third_time": {
+      "speaker": "any",
+      "line": "You again."
+    },
+    "survived_all_seven": {
+      "speaker": "croupier",
+      "line": "All seven, in one sitting. The ledger has a page for that."
+    },
+    "bust_at_high_purse": {
+      "speaker": "croupier",
+      "line": "You had enough. You wanted the number to be rounder."
+    }
+  },
+
+  "fragments": {
+    "_note": "Unlocked by defeating a sin N times. Delivered on the ledger screen, never mid-run. Each answers a little of why the player is at the wheel at all - and never all of it.",
+    "pride_3": "You signed it yourself. Nobody held your hand.",
+    "greed_3": "The sum was small. That was the trick of it. The sum is always small.",
+    "wrath_3": "You broke something you have not named yet.",
+    "envy_3": "It was somebody else's life. You wanted the shape of it.",
+    "lust_3": "You had a plan. You have had several.",
+    "gluttony_3": "You were not hungry. That was never the reason.",
+    "sloth_3": "You could have left in the first week.",
+    "all_7": "The Croupier turns the wheel. He does not spin it. You have always spun it."
+  }
+}

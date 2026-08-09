@@ -40,6 +40,22 @@ The UI is built from the authored 32-colour pixel-art set in
 - Everything regenerates from `Tools/gen_*_px.py` — the palette in
   `Tools/palette32.py` is the single source of colour.
 
+## Narrative
+
+The wheel is a debt being serviced (design doc:
+`Assets/Resources/Art/Narrative/NARRATIVE_DESIGN.md`; every line lives in
+`Assets/Resources/Narrative/narrative_lines.json`). Delivery rule: narrative
+never gates a spin. The Croupier bookends each run (speech plate at start,
+ledger quote at end), sins announce themselves with authored arrival plates,
+taunt mid-encounter without repeats, and get a last word if you flee. Reactive
+lines watch behaviour (instant-bank streaks, long unbanked runs, repeat
+encounters). Defeating a sin three times unlocks a lore fragment, shown on the
+ledger between runs — eight in total.
+
+The game opens on a main menu (intertitle card, PLAY, music volume slider,
+fragment count). "Cathedral Rift" loops underneath at a default volume of 0.35,
+adjustable and persisted in the save.
+
 ## Architecture
 
 Everything is composed in code from a single scene (`Assets/Scenes/Main.unity`)

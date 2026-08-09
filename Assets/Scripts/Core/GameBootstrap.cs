@@ -26,7 +26,9 @@ namespace SinWheel
             _ctx.Analytics = new AnalyticsSystem(new DebugLogAnalyticsSink());
             _ctx.Save = new SaveSystem(new NullCloudSaveProvider());
             _ctx.Save.Load();
+            Music.Init(_ctx.Save.Data.musicVolume);
 
+            _ctx.Narrative = new NarrativeSystem(_ctx);
             _ctx.Upgrades = new UpgradeSystem(_ctx);
             _ctx.Health = new HealthSystem();
             _ctx.Wallet = new CurrencySystem(_ctx);
@@ -40,7 +42,7 @@ namespace SinWheel
             _ctx.Hud.Build();
 
             _ctx.Analytics.TrackSessionStart();
-            _ctx.Game.StartRun();
+            _ctx.Hud.ShowMainMenu();
         }
 
         private void Update()

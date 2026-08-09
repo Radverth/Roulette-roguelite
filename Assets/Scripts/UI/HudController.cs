@@ -5,10 +5,10 @@ using UnityEngine.UI;
 namespace SinWheel
 {
     /// <summary>
-    /// Pixel-art HUD. Designed on a 180x320 virtual-pixel grid; the canvas
-    /// scales that grid by an integer factor (x6 on a 1080x1920 phone) so the
-    /// art never leaves the pixel grid. All widgets come from the authored
-    /// sprite set (Resources/Art) and text uses the 5x7 bitmap font.
+    /// Pixel-art HUD on a 180x320 virtual-pixel grid with integer canvas
+    /// scaling. Narrative delivery follows the design doc: plates and speech
+    /// slide in over the wheel and auto-dismiss — nothing is ever modal during
+    /// a run; quotes and fragments wait for the ledger (run-end) screen.
     /// </summary>
     public sealed class HudController
     {
@@ -42,13 +42,26 @@ namespace SinWheel
         private PixelText _bossStatus;
         private Image _resistFill;
         private GameObject _resistRow;
-        private GameObject _bossCardOverlay;
-        private Image _bossCardImage;
-        private Coroutine _bossCardRoutine;
+
+        // Single non-modal voice slot over the wheel: authored arrival plates
+        // or composed mask+line speech.
+        private GameObject _voiceSlot;
+        private Image _voicePlate;
+        private GameObject _voiceComposed;
+        private Image _voiceMask;
+        private PixelText _voiceName;
+        private PixelText _voiceLine;
+        private Coroutine _voiceRoutine;
+
+        private GameObject _menuPanel;
+        private PixelText _menuFragments;
 
         private GameObject _runEndPanel;
-        private Image _runEndBanner;
+        private Image _runEndIntertitle;
+        private PixelText _runEndQuote;
         private PixelText _runEndStats;
+        private GameObject _fragmentCard;
+        private PixelText _fragmentText;
 
         private GameObject _upgradesPanel;
         private RectTransform _upgradesContent;
@@ -67,11 +80,9 @@ namespace SinWheel
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.pixelPerfect = true;
 
-            // Integer scaling keeps the pixel grid intact: x6 on 1080x1920,
-            // x8 on 1440p, x1 fallback in tiny editor windows.
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-            scaler.referencePixelsPerUnit = 16f; // match sprite PPU: 1 unit = 1 art px
+            scaler.referencePixelsPerUnit = 16f; // 1 canvas unit = 1 art px
             scaler.scaleFactor = Mathf.Max(1, Mathf.FloorToInt(
                 Mathf.Min(Screen.width / (float)VirtualW, Screen.height / (float)VirtualH)));
 
@@ -90,14 +101,15 @@ namespace SinWheel
             BuildBossStrip();
             BuildWheelArea();
             BuildBottomBar();
-            BuildBossCardOverlay();
+            BuildVoiceSlot();
             BuildRunEndPanel();
             BuildUpgradesPanel();
+            BuildMainMenu();
         }
 
-        // --- Construction (positions in virtual px, anchored to frame top-center) ---
-
         private Vector2 Top => new Vector2(0.5f, 1f);
+
+        // --- Construction ---
 
         private void BuildTopBar()
         {
@@ -182,50 +194,133 @@ namespace SinWheel
             UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(45f, -306f), new Vector2(48f, 16f));
         }
 
-        private void BuildBossCardOverlay()
+        private void BuildVoiceSlot()
         {
-            var dim = UiFactory.CreatePanel(_root, "BossCardOverlay", new Color(0.02f, 0.01f, 0.04f, 0.88f));
-            UiFactory.Stretch(dim, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            _bossCardOverlay = dim.gameObject;
+            // Slides in over the wheel, never over the spin button; the player
+            // can always spin through it. Auto-dismisses.
+            _voiceSlot = UiFactory.CreateRect(_frame, "VoiceSlot").gameObject;
+            UiFactory.Place((RectTransform)_voiceSlot.transform, Top, new Vector2(0f, -138f), new Vector2(160f, 64f));
 
-            var dimButton = dim.gameObject.AddComponent<Button>();
-            dimButton.transition = Selectable.Transition.None;
-            dimButton.onClick.AddListener(HideBossCard);
+            _voicePlate = UiFactory.CreateSpriteImage(_voiceSlot.transform, "Plate", null, new Vector2(160f, 64f));
+            UiFactory.Place((RectTransform)_voicePlate.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160f, 64f));
 
-            _bossCardImage = UiFactory.CreateSpriteImage(dim, "Card", null, new Vector2(96f, 144f));
-            UiFactory.Place((RectTransform)_bossCardImage.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(96f, 144f));
+            var composed = UiFactory.CreateNineSlice(_voiceSlot.transform, "Composed", "UI/panel");
+            UiFactory.Stretch((RectTransform)composed.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            composed.raycastTarget = false;
+            _voiceComposed = composed.gameObject;
 
-            var hint = PixelText.Create(dim, "Hint", "TAP TO FACE IT", Palette.Dim);
-            UiFactory.Place((RectTransform)hint.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -86f), Vector2.zero);
+            _voiceMask = UiFactory.CreateSpriteImage(composed.transform, "Mask", null, new Vector2(48f, 48f));
+            UiFactory.Place((RectTransform)_voiceMask.transform, new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(48f, 48f));
 
-            _bossCardOverlay.SetActive(false);
+            _voiceName = PixelText.Create(composed.transform, "Name", "", Palette.Bone, 1, PxAlign.Left);
+            UiFactory.Place((RectTransform)_voiceName.transform, new Vector2(0f, 0.5f), new Vector2(56f, 21f), Vector2.zero);
+
+            var divider = UiFactory.CreateSpriteImage(composed.transform, "Divider", "Narrative/ornament_divider", new Vector2(32f, 8f));
+            UiFactory.Place((RectTransform)divider.transform, new Vector2(0f, 0.5f), new Vector2(72f, 12f), new Vector2(32f, 8f));
+
+            _voiceLine = PixelText.Create(composed.transform, "Line", "", Palette.Bone, 1, PxAlign.Left, 96);
+            UiFactory.Place((RectTransform)_voiceLine.transform, new Vector2(0f, 0.5f), new Vector2(56f, -8f), Vector2.zero);
+
+            _voiceSlot.SetActive(false);
+        }
+
+        private void BuildMainMenu()
+        {
+            var overlay = UiFactory.CreatePanel(_root, "MainMenu", Palette.Night);
+            UiFactory.Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            _menuPanel = overlay.gameObject;
+
+            var frame = UiFactory.CreateRect(overlay, "Frame");
+            UiFactory.Place(frame, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(VirtualW, VirtualH));
+
+            var title = PixelText.Create(frame, "Title", "SIN WHEEL", Palette.Gold, 2);
+            UiFactory.Place((RectTransform)title.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 118f), Vector2.zero);
+
+            // The intertitle carries its own text: THE WHEEL / SEVEN WILL ANSWER / TAP TO BEGIN.
+            var card = UiFactory.CreateRect(frame, "StartCard");
+            UiFactory.Place(card, new Vector2(0.5f, 0.5f), new Vector2(0f, 52f), new Vector2(128f, 72f));
+            var cardImg = card.gameObject.AddComponent<Image>();
+            cardImg.sprite = ArtSprites.Get("Narrative/intertitle_start");
+            var cardButton = card.gameObject.AddComponent<Button>();
+            cardButton.transition = Selectable.Transition.None;
+            cardButton.onClick.AddListener(PlayFromMenu);
+
+            var play = UiFactory.CreatePixelButton(frame, "Play", "PLAY", true, 2, PlayFromMenu, out _);
+            UiFactory.Place((RectTransform)play.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -34f), new Vector2(96f, 32f));
+
+            var musicLabel = PixelText.Create(frame, "MusicLabel", "MUSIC", Palette.Bone, 1, PxAlign.Left);
+            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -78f), Vector2.zero);
+
+            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -78f),
+                _ctx.Save.Data.musicVolume, v =>
+                {
+                    Music.SetVolume(v);
+                    _ctx.Save.Data.musicVolume = v;
+                });
+
+            _menuFragments = PixelText.Create(frame, "Fragments", "", Palette.Dim);
+            UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -112f), Vector2.zero);
+
+            _menuPanel.SetActive(false);
+        }
+
+        private void PlayFromMenu()
+        {
+            _menuPanel.SetActive(false);
+            _ctx.Save.Persist(); // volume changes commit when leaving the menu
+            _ctx.Game.StartRun();
+        }
+
+        public void ShowMainMenu()
+        {
+            _menuFragments.Text = $"FRAGMENTS {_ctx.Narrative.FragmentCount}/{NarrativeSystem.TotalFragments}";
+            HideVoice();
+            _runEndPanel.SetActive(false);
+            _menuPanel.SetActive(true);
         }
 
         private void BuildRunEndPanel()
         {
-            var overlay = UiFactory.CreatePanel(_root, "RunEndPanel", new Color(0.02f, 0.01f, 0.04f, 0.92f));
+            var overlay = UiFactory.CreatePanel(_root, "RunEndPanel", Palette.Night);
             UiFactory.Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _runEndPanel = overlay.gameObject;
 
-            _runEndBanner = UiFactory.CreateSpriteImage(overlay, "Banner", null, new Vector2(160f, 48f));
-            UiFactory.Place((RectTransform)_runEndBanner.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 70f), new Vector2(160f, 48f));
+            var frame = UiFactory.CreateRect(overlay, "Frame");
+            UiFactory.Place(frame, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(VirtualW, VirtualH));
 
-            _runEndStats = PixelText.Create(overlay, "Stats", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_runEndStats.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
+            _runEndIntertitle = UiFactory.CreateSpriteImage(frame, "Intertitle", null, new Vector2(128f, 72f));
+            UiFactory.Place((RectTransform)_runEndIntertitle.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 96f), new Vector2(128f, 72f));
 
-            var newRun = UiFactory.CreatePixelButton(overlay, "NewRun", "SPIN AGAIN", true, 2, () =>
+            _runEndQuote = PixelText.Create(frame, "Quote", "", Palette.Dim, 1, PxAlign.Center, 150);
+            UiFactory.Place((RectTransform)_runEndQuote.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 34f), Vector2.zero);
+
+            _runEndStats = PixelText.Create(frame, "Stats", "", Palette.Bone);
+            UiFactory.Place((RectTransform)_runEndStats.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), Vector2.zero);
+
+            // Fragment plate: blank body in the art, filled at runtime.
+            var card = UiFactory.CreateSpriteImage(frame, "FragmentCard", "Narrative/fragment_card", new Vector2(80f, 112f));
+            UiFactory.Place((RectTransform)card.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -4f), new Vector2(80f, 112f));
+            _fragmentCard = card.gameObject;
+            _fragmentText = PixelText.Create(card.transform, "Text", "", Palette.Bone, 1, PxAlign.Center, 64);
+            UiFactory.Place((RectTransform)_fragmentText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -8f), Vector2.zero);
+            _fragmentCard.SetActive(false);
+
+            var newRun = UiFactory.CreatePixelButton(frame, "NewRun", "SPIN AGAIN", true, 2, () =>
             {
                 _runEndPanel.SetActive(false);
                 _ctx.Game.StartRun();
             }, out _);
-            UiFactory.Place((RectTransform)newRun.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -70f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)newRun.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -92f), new Vector2(96f, 32f));
+
+            var menu = UiFactory.CreatePixelButton(frame, "Menu", "MENU", false, 1, ShowMainMenu, out _);
+            UiFactory.Place((RectTransform)menu.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -122f), new Vector2(48f, 16f));
 
             _runEndPanel.SetActive(false);
         }
 
         private void BuildUpgradesPanel()
         {
-            var overlay = UiFactory.CreatePanel(_root, "UpgradesPanel", new Color(0.02f, 0.01f, 0.04f, 0.94f));
+            var overlay = UiFactory.CreatePanel(_root, "UpgradesPanel", Palette.Night);
             UiFactory.Stretch(overlay, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             _upgradesPanel = overlay.gameObject;
 
@@ -272,7 +367,7 @@ namespace SinWheel
                 UiFactory.Place((RectTransform)name.transform, new Vector2(0f, 0.5f), new Vector2(8f, 13f), Vector2.zero);
 
                 var desc = PixelText.Create(row.transform, "Desc", cfg.description, Palette.Dim, 1, PxAlign.Left, 104);
-                UiFactory.Place((RectTransform)desc.transform, new Vector2(0f, 0.5f), new Vector2(8f, -6f), Vector2.zero);
+                UiFactory.Place((RectTransform)desc.transform, new Vector2(0f, 0.5f), new Vector2(8f, -8f), Vector2.zero);
 
                 bool maxed = tier >= cfg.maxTier;
                 string buyLabel = maxed ? "MAX" : _ctx.Upgrades.GetCost(cfg, tier).ToString();
@@ -353,6 +448,55 @@ namespace SinWheel
             }
         }
 
+        // --- Voice (plates + speech), never modal ---
+
+        /// <summary>Authored arrival plate — the sin's one line, baked into the art.</summary>
+        public void ShowArrivalPlate(string sinId)
+        {
+            _voicePlate.sprite = ArtSprites.Get("Narrative/plate_" + sinId);
+            _voicePlate.gameObject.SetActive(true);
+            _voiceComposed.SetActive(false);
+            PresentVoice(2.2f);
+        }
+
+        /// <summary>Composed speech: mask + name + line, for everything with variable text.</summary>
+        public void ShowSpeech(string speakerId, string line)
+        {
+            if (string.IsNullOrEmpty(line)) return;
+
+            _voiceMask.sprite = ArtSprites.Get("Narrative/mask_" + speakerId);
+            _voiceName.Text = NarrativeSystem.SpeakerName(speakerId);
+            _voiceName.Color = _ctx.Narrative.SpeakerColor(speakerId);
+            _voiceLine.Text = line;
+            _voicePlate.gameObject.SetActive(false);
+            _voiceComposed.SetActive(true);
+            PresentVoice(2.2f);
+        }
+
+        private void PresentVoice(float seconds)
+        {
+            if (_voiceRoutine != null) _ctx.CoroutineHost.StopCoroutine(_voiceRoutine);
+            _voiceSlot.SetActive(true);
+            _voiceRoutine = _ctx.CoroutineHost.StartCoroutine(VoiceAutoHide(seconds));
+        }
+
+        private IEnumerator VoiceAutoHide(float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            _voiceSlot.SetActive(false);
+            _voiceRoutine = null;
+        }
+
+        private void HideVoice()
+        {
+            if (_voiceRoutine != null)
+            {
+                _ctx.CoroutineHost.StopCoroutine(_voiceRoutine);
+                _voiceRoutine = null;
+            }
+            _voiceSlot.SetActive(false);
+        }
+
         // --- Moments ---
 
         public void ShowOutcome(OutcomeResult result)
@@ -387,9 +531,10 @@ namespace SinWheel
 
         public void OnRunStarted()
         {
+            _menuPanel.SetActive(false);
             _runEndPanel.SetActive(false);
             _bossStrip.SetActive(false);
-            HideBossCard();
+            HideVoice();
         }
 
         public void OnBossStarted(BossEncounter encounter)
@@ -399,7 +544,7 @@ namespace SinWheel
             _bossName.Text = encounter.Config.displayName;
             _resistRow.SetActive(encounter.Config.resistThreshold > 0);
             OnBossUpdated(encounter);
-            ShowBossCard(encounter.Config.id);
+            ShowArrivalPlate(encounter.Config.id);
             Shake();
         }
 
@@ -415,39 +560,29 @@ namespace SinWheel
             _bossStrip.SetActive(false);
         }
 
-        private void ShowBossCard(string sinId)
-        {
-            _bossCardImage.sprite = ArtSprites.CardFor(sinId);
-            _bossCardOverlay.SetActive(true);
-            if (_bossCardRoutine != null) _ctx.CoroutineHost.StopCoroutine(_bossCardRoutine);
-            _bossCardRoutine = _ctx.CoroutineHost.StartCoroutine(BossCardAutoHide());
-        }
-
-        private IEnumerator BossCardAutoHide()
-        {
-            yield return new WaitForSeconds(2.6f);
-            HideBossCard();
-        }
-
-        private void HideBossCard()
-        {
-            if (_bossCardRoutine != null)
-            {
-                _ctx.CoroutineHost.StopCoroutine(_bossCardRoutine);
-                _bossCardRoutine = null;
-            }
-            _bossCardOverlay.SetActive(false);
-        }
-
         public void ShowRunEnd(bool banked, int bankedAmount, int spins)
         {
             _runEndPanel.SetActive(true);
-            _runEndBanner.sprite = ArtSprites.Get(banked ? "UI/banner_bank" : "UI/banner_bust");
-            _runEndStats.Text =
-                (banked ? $"+{bankedAmount} COINS BANKED" : "UNBANKED COINS FORFEIT") +
-                $"\nSPINS: {spins}" +
-                $"\nBANK: {_ctx.Wallet.MetaCoins}" +
-                $"\nLEVEL {_ctx.Xp.Level}";
+            _runEndIntertitle.sprite = ArtSprites.Get(banked ? "Narrative/intertitle_bank" : "Narrative/intertitle_bust");
+
+            string fragment = _ctx.Narrative.ConsumePendingFragment();
+            if (!string.IsNullOrEmpty(fragment))
+            {
+                // A fragment owns the ledger this time; the quote can wait.
+                _ctx.Narrative.ConsumeRunEndQuote();
+                _fragmentCard.SetActive(true);
+                _fragmentText.Text = fragment;
+                _runEndQuote.Text = "";
+                _runEndStats.Text = "";
+            }
+            else
+            {
+                _fragmentCard.SetActive(false);
+                _runEndQuote.Text = _ctx.Narrative.ConsumeRunEndQuote() ?? "";
+                _runEndStats.Text =
+                    (banked ? $"+{bankedAmount} COINS BANKED" : "UNBANKED COINS FORFEIT") +
+                    $"\nSPINS {spins} - BANK {_ctx.Wallet.MetaCoins} - LV {_ctx.Xp.Level}";
+            }
         }
 
         // --- Juice ---
@@ -487,7 +622,7 @@ namespace SinWheel
         private IEnumerator ShakeRoutine()
         {
             const float duration = 0.3f;
-            const float magnitude = 3f; // virtual px — big at x6 device scale
+            const float magnitude = 3f;
             float elapsed = 0f;
 
             while (elapsed < duration)
