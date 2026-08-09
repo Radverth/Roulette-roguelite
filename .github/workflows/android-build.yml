@@ -1,0 +1,66 @@
+# Builds an Android APK on every push/PR to main.
+#
+# Required repository secrets (see README "CI/CD setup"):
+#   UNITY_LICENSE   - contents of a Unity .ulf license file (personal license works)
+#   UNITY_EMAIL     - Unity account email
+#   UNITY_PASSWORD  - Unity account password
+#
+# Optional signing secrets (falls back to a debug-signed APK when absent):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASS,
+#   ANDROID_KEYALIAS_NAME, ANDROID_KEYALIAS_PASS
+#
+# The job fails loudly on any C# compile error, so a broken build can never
+# sit unnoticed on main.
+
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-Android-
+            Library-
+
+      - name: Build with Unity
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          buildName: SinWheel
+          androidExportType: androidPackage
+          androidKeystoreName: user.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SinWheel-Android
+          path: build/Android
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,114 @@
+{
+  "upgrades": [
+    {
+      "id": "spin_cooldown",
+      "displayName": "Quick Hands",
+      "description": "Reduce spin cooldown by 0.15s per tier.",
+      "category": "meta",
+      "sinId": "",
+      "maxTier": 5,
+      "baseCost": 50,
+      "costGrowth": 2.0,
+      "effectPerTier": 0.15
+    },
+    {
+      "id": "hp_cap",
+      "displayName": "Iron Resolve",
+      "description": "Raise maximum resilience by 20 per tier.",
+      "category": "meta",
+      "sinId": "",
+      "maxTier": 5,
+      "baseCost": 60,
+      "costGrowth": 2.0,
+      "effectPerTier": 20
+    },
+    {
+      "id": "banking_bonus",
+      "displayName": "Silver Tongue",
+      "description": "Bank 5% more coins per tier when ending a run.",
+      "category": "meta",
+      "sinId": "",
+      "maxTier": 5,
+      "baseCost": 80,
+      "costGrowth": 2.0,
+      "effectPerTier": 0.05
+    },
+    {
+      "id": "resist_sloth",
+      "displayName": "Restless Spirit",
+      "description": "Sloth's cooldown penalty softens by 0.2x per tier.",
+      "category": "sin_resist",
+      "sinId": "sloth",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 0.2
+    },
+    {
+      "id": "resist_pride",
+      "displayName": "Humble Heart",
+      "description": "Pride's reward shrink softens by 5% per tier.",
+      "category": "sin_resist",
+      "sinId": "pride",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 5
+    },
+    {
+      "id": "resist_greed",
+      "displayName": "Open Palm",
+      "description": "Greed's coin tax softens by 8% per tier.",
+      "category": "sin_resist",
+      "sinId": "greed",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 8
+    },
+    {
+      "id": "resist_wrath",
+      "displayName": "Calm Waters",
+      "description": "Wrath's extra damage segments deal 15% less per tier.",
+      "category": "sin_resist",
+      "sinId": "wrath",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 15
+    },
+    {
+      "id": "resist_envy",
+      "displayName": "Content Soul",
+      "description": "Envy copies a weaker version of your buff, 20% per tier.",
+      "category": "sin_resist",
+      "sinId": "envy",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 20
+    },
+    {
+      "id": "resist_lust",
+      "displayName": "Steady Gaze",
+      "description": "Lust shuffles the wheel less often, +1 spin per tier.",
+      "category": "sin_resist",
+      "sinId": "lust",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 1
+    },
+    {
+      "id": "resist_gluttony",
+      "displayName": "Thin Fare",
+      "description": "Gluttony's spin toll shrinks by 0.5% per tier.",
+      "category": "sin_resist",
+      "sinId": "gluttony",
+      "maxTier": 3,
+      "baseCost": 100,
+      "costGrowth": 2.5,
+      "effectPerTier": 0.5
+    }
+  ]
+}

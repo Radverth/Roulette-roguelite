@@ -1,0 +1,17 @@
+{
+  "baseSpinCooldown": 1.5,
+  "minSpinCooldown": 0.5,
+  "spinAnimDuration": 2.2,
+  "baseMaxHp": 100,
+  "sinSummonBaseChance": 0.25,
+  "sinSummonChanceIncrement": 0.15,
+  "sinSummonChanceMax": 0.95,
+  "xpBase": 20,
+  "xpGrowth": 1.35,
+  "bankingBonusBase": 1.0,
+  "buffRewardMultiplier": 1.25,
+  "buffDurationSpins": 5,
+  "debuffDamageMultiplier": 1.5,
+  "debuffDurationSpins": 5,
+  "wheelTextureSize": 640
+}
