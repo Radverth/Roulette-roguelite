@@ -52,3 +52,8 @@ PlayerSettings:
   iPhoneStrippingLevel: 0
   gcIncremental: 1
   activeInputHandler: 0
+  scriptingBackend:
+    Android: 1
+  il2cppCompilerConfiguration:
+    Android: 0
+  AndroidTargetArchitectures: 3
