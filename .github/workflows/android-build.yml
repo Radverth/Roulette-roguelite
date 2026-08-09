@@ -41,6 +41,16 @@ jobs:
             Library-Android-
             Library-
 
+      # Release signing: once ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASS /
+      # ANDROID_KEYALIAS_NAME / ANDROID_KEYALIAS_PASS secrets exist, add these
+      # inputs back under `with:` — passing androidKeystoreName with empty
+      # passwords makes Unity fail with "Can not sign the application" instead
+      # of falling back to debug signing:
+      #   androidKeystoreName: user.keystore
+      #   androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      #   androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+      #   androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+      #   androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
       - name: Build with Unity
         uses: game-ci/unity-builder@v4
         env:
@@ -51,11 +61,6 @@ jobs:
           targetPlatform: Android
           buildName: SinWheel
           androidExportType: androidPackage
-          androidKeystoreName: user.keystore
-          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
