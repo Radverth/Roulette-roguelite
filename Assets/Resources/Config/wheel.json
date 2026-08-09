@@ -1,0 +1,17 @@
+{
+  "wheelId": "base_12",
+  "segments": [
+    { "id": "coins_small_a", "type": "Coins", "label": "+10", "weight": 10, "amount": 10, "colorHex": "#D4AF37" },
+    { "id": "damage_a", "type": "Damage", "label": "-12 HP", "weight": 6, "amount": 12, "colorHex": "#A32633" },
+    { "id": "xp_small", "type": "Xp", "label": "+8 XP", "weight": 8, "amount": 8, "colorHex": "#4FA6A0" },
+    { "id": "coin_loss", "type": "CoinLoss", "label": "-25%", "weight": 4, "amount": 25, "colorHex": "#5E1420" },
+    { "id": "coins_medium", "type": "Coins", "label": "+25", "weight": 6, "amount": 25, "colorHex": "#E0BE4E" },
+    { "id": "debuff", "type": "Debuff", "label": "HEX", "weight": 4, "amount": 0, "colorHex": "#7A8C3F" },
+    { "id": "buff", "type": "Buff", "label": "BLESS", "weight": 4, "amount": 0, "colorHex": "#E8DCC0" },
+    { "id": "sin_summon", "type": "SinSummon", "label": "SIN", "weight": 5, "amount": 0, "colorHex": "#7B4FA6" },
+    { "id": "coins_small_b", "type": "Coins", "label": "+15", "weight": 8, "amount": 15, "colorHex": "#D4AF37" },
+    { "id": "damage_b", "type": "Damage", "label": "-20 HP", "weight": 5, "amount": 20, "colorHex": "#A32633" },
+    { "id": "xp_medium", "type": "Xp", "label": "+15 XP", "weight": 4, "amount": 15, "colorHex": "#4FA6A0" },
+    { "id": "gems", "type": "Gems", "label": "GEM", "weight": 2, "amount": 1, "colorHex": "#9B6FD0" }
+  ]
+}
