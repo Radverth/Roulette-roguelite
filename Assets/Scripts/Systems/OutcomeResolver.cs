@@ -58,7 +58,7 @@ namespace SinWheel
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,
-                        Text = $"BLESSING +{pct}% x{t.buffDurationSpins}",
+                        Text = $"BLESS +{pct}% X{t.buffDurationSpins}",
                         Color = Palette.Bone
                     };
                 }
@@ -92,7 +92,7 @@ namespace SinWheel
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,
-                        Text = $"HEXED x{t.debuffDurationSpins} SPINS",
+                        Text = $"HEXED X{t.debuffDurationSpins} SPINS",
                         Color = Palette.Sickly
                     };
                 }

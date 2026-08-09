@@ -7,208 +7,170 @@ using UnityEngine.UI;
 namespace SinWheel
 {
     /// <summary>
-    /// Renders the wheel as a procedurally generated pie texture and animates
-    /// spins. The landing segment is pre-rolled by SpinSystem (weights decide
-    /// fairness); the animation just eases onto it, so visuals always match
-    /// resolution. Rebuild() supports future sins that warp the wheel itself
-    /// (Wrath's extra segments, Lust's shuffles).
+    /// The authored pixel wheel, layered per the art spec:
+    ///   glow → disc (rotates, carries wedge icons) → rim (static) →
+    ///   segment flash (static, drawn at 12 o'clock) → hub → pointer.
+    /// Wedge order is authored (risk at indices 1/4/7/10 so no two are
+    /// adjacent) — wheel.json must list segments in the same order; see
+    /// Art/Wheel/segment_layout.txt.
+    /// The landing segment is pre-rolled by SpinSystem; the animation eases
+    /// the disc onto it, so visuals always match resolution.
     /// </summary>
     public sealed class WheelController
     {
-        private readonly GameContext _ctx;
-        private readonly RectTransform _wheelRt;
-        private readonly List<Text> _labels = new List<Text>();
+        private const float Arc = 30f;         // 12 wedges
+        private const float IconRadius = 42f;  // wedge icon centers, in art px
 
-        private List<SegmentConfig> _segments;
-        private Sprite _wheelSprite;
+        private readonly GameContext _ctx;
+        private readonly RectTransform _container;
+        private readonly RectTransform _disc;
+        private readonly Image _flash;
+        private readonly List<Image> _icons = new List<Image>();
+
         private float _currentRotation;
+        private Coroutine _flashRoutine;
 
         public bool IsSpinning { get; private set; }
 
-        public WheelController(GameContext ctx, RectTransform container, float diameter)
+        public WheelController(GameContext ctx, RectTransform container)
         {
             _ctx = ctx;
+            _container = container;
 
-            _wheelRt = UiFactory.CreateRect(container, "Wheel");
-            UiFactory.Place(_wheelRt, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(diameter, diameter));
-            _wheelRt.gameObject.AddComponent<Image>();
+            var glow = UiFactory.CreateSpriteImage(container, "Glow", "Wheel/wheel_glow", new Vector2(128f, 128f));
+            glow.color = new Color(1f, 1f, 1f, 0.55f);
+            UiFactory.Place((RectTransform)glow.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
 
-            // Pointer sits above the wheel, apex pointing down at 12 o'clock.
-            var pointerRt = UiFactory.CreateRect(container, "Pointer");
-            UiFactory.Place(pointerRt, new Vector2(0.5f, 0.5f), new Vector2(0f, diameter * 0.5f + 8f), new Vector2(56f, 56f));
-            var pointerImg = pointerRt.gameObject.AddComponent<Image>();
-            pointerImg.sprite = BuildPointerSprite();
-            pointerImg.color = Palette.Gold;
+            var discImg = UiFactory.CreateSpriteImage(container, "Disc", "Wheel/wheel_disc", new Vector2(128f, 128f));
+            _disc = (RectTransform)discImg.transform;
+            UiFactory.Place(_disc, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
+
+            var rim = UiFactory.CreateSpriteImage(container, "Rim", "Wheel/wheel_rim", new Vector2(128f, 128f));
+            UiFactory.Place((RectTransform)rim.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
+
+            _flash = UiFactory.CreateSpriteImage(container, "Flash", "Wheel/wheel_segment_flash", new Vector2(128f, 128f));
+            UiFactory.Place((RectTransform)_flash.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
+            _flash.gameObject.SetActive(false);
+
+            var hub = UiFactory.CreateSpriteImage(container, "Hub", "Wheel/wheel_hub", new Vector2(32f, 32f));
+            UiFactory.Place((RectTransform)hub.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(32f, 32f));
+
+            var pointer = UiFactory.CreateSpriteImage(container, "Pointer", "Wheel/wheel_pointer", new Vector2(16f, 24f));
+            UiFactory.Place((RectTransform)pointer.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 62f), new Vector2(16f, 24f));
 
             Rebuild(ctx.Config.Wheel.segments);
         }
 
+        /// <summary>Re-lay the wedge icons (Lust's shuffles / Wrath's inserts will call this).</summary>
         public void Rebuild(List<SegmentConfig> segments)
         {
-            _segments = segments;
+            foreach (var icon in _icons)
+                if (icon != null) UnityEngine.Object.Destroy(icon.gameObject);
+            _icons.Clear();
 
-            int size = _ctx.Config.Tuning.wheelTextureSize;
-            var tex = BuildWheelTexture(segments, size);
-            _wheelSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
-            _wheelRt.GetComponent<Image>().sprite = _wheelSprite;
+            float arc = 360f / segments.Count;
+            for (int i = 0; i < segments.Count; i++)
+            {
+                // Wedge i is centered i*arc clockwise from 12 o'clock; icons are
+                // children of the disc so they carry its rotation.
+                float angle = (90f - i * arc) * Mathf.Deg2Rad;
+                var pos = new Vector2(Mathf.Cos(angle) * IconRadius, Mathf.Sin(angle) * IconRadius);
 
-            RebuildLabels(segments);
+                var img = UiFactory.CreateSpriteImage(_disc, $"Icon_{i}", null, new Vector2(16f, 16f));
+                img.sprite = ArtSprites.IconForSegment(segments[i]);
+                UiFactory.Place((RectTransform)img.transform, new Vector2(0.5f, 0.5f), pos, new Vector2(16f, 16f));
+                _icons.Add(img);
+            }
         }
 
-        /// <summary>Spin to put segment <paramref name="index"/> under the pointer.</summary>
+        /// <summary>Spin so wedge <paramref name="index"/> lands under the pointer.</summary>
         public void SpinTo(int index, float duration, Action onComplete)
         {
             if (IsSpinning) return;
             IsSpinning = true;
+            if (_flashRoutine != null) _ctx.CoroutineHost.StopCoroutine(_flashRoutine);
+            _flash.gameObject.SetActive(false);
             _ctx.CoroutineHost.StartCoroutine(SpinRoutine(index, duration, onComplete));
         }
 
         private IEnumerator SpinRoutine(int index, float duration, Action onComplete)
         {
-            float arc = 360f / _segments.Count;
-
-            // Wheel rotation z (CCW+) puts segment floor((z % 360) / arc) under
-            // the top pointer, so center segment `index` with z ≡ index*arc + arc/2.
-            float jitter = ((float)_ctx.Rng.NextDouble() - 0.5f) * arc * 0.6f;
-            float desiredMod = index * arc + arc * 0.5f + jitter;
+            // Disc rotation z (CCW+) brings wedge k (authored k*30° clockwise
+            // from top) under the pointer when z ≡ k*30.
+            float jitter = ((float)_ctx.Rng.NextDouble() - 0.5f) * Arc * 0.5f;
+            float desiredMod = index * Arc + jitter;
 
             float start = _currentRotation;
-            float baseTarget = start + 720f; // at least two full turns for weight
+            float baseTarget = start + 720f;
             float target = baseTarget + Mathf.Repeat(desiredMod - baseTarget, 360f);
 
-            int lastTickSegment = Mathf.FloorToInt(Mathf.Repeat(start, 360f) / arc);
+            int lastTick = Mathf.FloorToInt((Mathf.Repeat(start, 360f) + Arc * 0.5f) / Arc);
             float elapsed = 0f;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
-                float eased = 1f - Mathf.Pow(1f - t, 3f); // ease-out cubic: fast launch, weighty settle
+                float eased = 1f - Mathf.Pow(1f - t, 3f); // fast launch, weighty settle
                 float z = Mathf.Lerp(start, target, eased);
-                _wheelRt.localRotation = Quaternion.Euler(0f, 0f, z);
+                _disc.localRotation = Quaternion.Euler(0f, 0f, z);
 
-                int tickSegment = Mathf.FloorToInt(Mathf.Repeat(z, 360f) / arc);
-                if (tickSegment != lastTickSegment)
+                int tick = Mathf.FloorToInt((Mathf.Repeat(z, 360f) + Arc * 0.5f) / Arc);
+                if (tick != lastTick)
                 {
-                    lastTickSegment = tickSegment;
+                    lastTick = tick;
                     Sfx.Tick();
                 }
                 yield return null;
             }
 
-            _wheelRt.localRotation = Quaternion.Euler(0f, 0f, target);
+            _disc.localRotation = Quaternion.Euler(0f, 0f, target);
             _currentRotation = Mathf.Repeat(target, 360f);
 
             Sfx.Land();
             Haptics.Light();
+            _flashRoutine = _ctx.CoroutineHost.StartCoroutine(FlashRoutine());
+            SpawnRingShock();
+
             IsSpinning = false;
             onComplete?.Invoke();
         }
 
-        // --- Procedural art ---
-
-        private Texture2D BuildWheelTexture(List<SegmentConfig> segments, int size)
+        private IEnumerator FlashRoutine()
         {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var pixels = new Color32[size * size];
-
-            float center = size * 0.5f;
-            float radius = center - 2f;
-            float rimWidth = size * 0.02f;
-            float hubRadius = size * 0.10f;
-            float arc = 360f / segments.Count;
-
-            Color32 clear = new Color32(0, 0, 0, 0);
-            Color32 rim = Palette.Gold;
-            Color32 hub = Palette.Night;
-            Color32 line = Palette.Night;
-
-            for (int y = 0; y < size; y++)
+            // The flash sprite is authored at 12 o'clock — exactly the landing wedge.
+            for (int i = 0; i < 3; i++)
             {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = x - center + 0.5f;
-                    float dy = y - center + 0.5f;
-                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
-
-                    int i = y * size + x;
-                    if (dist > radius)
-                    {
-                        pixels[i] = clear;
-                        continue;
-                    }
-                    if (dist > radius - rimWidth)
-                    {
-                        pixels[i] = rim;
-                        continue;
-                    }
-                    if (dist < hubRadius)
-                    {
-                        pixels[i] = dist > hubRadius - rimWidth * 0.6f ? rim : hub;
-                        continue;
-                    }
-
-                    float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;      // -180..180, 0 = +x
-                    float rel = Mathf.Repeat(90f - angle, 360f);            // 0 at top, clockwise
-                    int segIndex = Mathf.Min((int)(rel / arc), segments.Count - 1);
-
-                    float within = rel - segIndex * arc;
-                    float edge = Mathf.Min(within, arc - within) * dist * Mathf.Deg2Rad;
-                    pixels[i] = edge < 1.5f ? line : (Color32)segments[segIndex].ParsedColor;
-                }
+                _flash.gameObject.SetActive(true);
+                yield return new WaitForSeconds(0.09f);
+                _flash.gameObject.SetActive(false);
+                yield return new WaitForSeconds(0.06f);
             }
-
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            return tex;
+            _flashRoutine = null;
         }
 
-        private void RebuildLabels(List<SegmentConfig> segments)
+        private void SpawnRingShock()
         {
-            foreach (var label in _labels)
-                if (label != null) UnityEngine.Object.Destroy(label.gameObject);
-            _labels.Clear();
-
-            float arc = 360f / segments.Count;
-            float radius = _wheelRt.sizeDelta.x * 0.36f;
-
-            for (int i = 0; i < segments.Count; i++)
-            {
-                // Texture-space angle of this segment's center; labels are
-                // parented to the wheel so they rotate with it.
-                float centerAngle = 90f - (i * arc + arc * 0.5f);
-                float rad = centerAngle * Mathf.Deg2Rad;
-                var pos = new Vector2(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
-
-                var text = UiFactory.CreateText(_wheelRt, $"Label_{i}", segments[i].label, 30, Palette.Night);
-                var rt = (RectTransform)text.transform;
-                rt.anchoredPosition = pos;
-                rt.sizeDelta = new Vector2(200f, 60f);
-                rt.localRotation = Quaternion.Euler(0f, 0f, centerAngle - 90f);
-                _labels.Add(text);
-            }
+            var img = UiFactory.CreateSpriteImage(_container, "RingShock", "Particles/ring_shock", new Vector2(32f, 32f));
+            UiFactory.Place((RectTransform)img.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 44f), new Vector2(32f, 32f));
+            _ctx.CoroutineHost.StartCoroutine(RingShockRoutine(img));
         }
 
-        private static Sprite BuildPointerSprite()
+        private IEnumerator RingShockRoutine(Image img)
         {
-            const int s = 48;
-            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
-            var pixels = new Color32[s * s];
-            Color32 solid = new Color32(255, 255, 255, 255);
-            Color32 clear = new Color32(0, 0, 0, 0);
+            const float life = 0.32f;
+            float elapsed = 0f;
+            var rt = (RectTransform)img.transform;
 
-            for (int y = 0; y < s; y++)
+            while (elapsed < life)
             {
-                // Apex at the bottom, widening toward the top.
-                float rowHalfWidth = (y / (float)s) * (s * 0.5f);
-                for (int x = 0; x < s; x++)
-                    pixels[y * s + x] = Mathf.Abs(x - s * 0.5f) <= rowHalfWidth ? solid : clear;
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / life);
+                rt.localScale = Vector3.one * (0.6f + 1.9f * t);
+                img.color = new Color(1f, 1f, 1f, 1f - t);
+                yield return null;
             }
-
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
-            return Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 100f);
+            UnityEngine.Object.Destroy(img.gameObject);
         }
     }
 }

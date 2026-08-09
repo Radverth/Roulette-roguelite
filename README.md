@@ -21,11 +21,30 @@ seam waiting for their implementations.
 5. Surviving a sin boss escalates the reward multiplier every spin: risk and
    reward climb together.
 
+## Art
+
+The UI is built from the authored 32-colour pixel-art set in
+`Assets/Resources/Art` (see its README for palette and sizing rules):
+
+- Layered wheel: glow → disc (rotates, carries wedge icons) → rim → landing
+  flash → hub → pointer. Wedge order is authored — risk wedges sit at indices
+  1/4/7/10 so no two are adjacent — and `wheel.json` lists segments in that
+  same order (`Art/Wheel/segment_layout.txt` is the contract).
+- All text renders through the 5x7 bitmap font (`PixelText`); strings are
+  upper-cased and restricted to the font's charset.
+- The HUD is laid out on a 180x320 virtual-pixel grid; `CanvasScaler` uses
+  constant-pixel-size with an integer factor (x6 on 1080x1920) so sprites never
+  leave the pixel grid.
+- Sin encounter cards (`card_*`) drop in as a tap-to-dismiss overlay when a
+  boss awakens; sigils (`sigil_*`) mark the persistent encounter strip.
+- Everything regenerates from `Tools/gen_*_px.py` — the palette in
+  `Tools/palette32.py` is the single source of colour.
+
 ## Architecture
 
 Everything is composed in code from a single scene (`Assets/Scenes/Main.unity`)
-containing one `GameBootstrap` component. No prefabs or binary assets — the
-whole slice is reviewable as text.
+containing one `GameBootstrap` component. Apart from the pixel-art sprites, no
+prefabs or binary scene assets — the wiring stays reviewable as text.
 
 ```
 GameBootstrap (MonoBehaviour, scene entry)

@@ -19,6 +19,14 @@ PlayerSettings:
   m_SplashScreenOverlayOpacity: 1
   bundleVersion: 0.1.0
   preloadedAssets: []
+  m_BuildTargetIcons:
+  - m_BuildTarget:
+    m_Icons:
+    - serializedVersion: 2
+      m_Icon: {fileID: 2800000, guid: d69c61ca82734a53991b6864aa4c7be6, type: 3}
+      m_Width: 512
+      m_Height: 512
+      m_Kind: 0
   StripUnusedMeshComponents: 1
   AndroidBlitType: 0
   defaultScreenWidth: 1080

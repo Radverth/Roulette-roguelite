@@ -46,7 +46,7 @@ namespace SinWheel
             {
                 // The wheel already answers to a sin; the omen just stings.
                 float dmg = _ctx.Health.ApplyDamage(5f * _ctx.Buffs.DamageMultiplier);
-                return $"THE SIN STIRS  -{Mathf.RoundToInt(dmg)} HP";
+                return $"THE SIN STIRS -{Mathf.RoundToInt(dmg)} HP";
             }
 
             var candidates = UnlockedSins();
@@ -65,7 +65,7 @@ namespace SinWheel
 
             _summonChance = Mathf.Min(_ctx.Config.Tuning.sinSummonChanceMax,
                 _summonChance + _ctx.Config.Tuning.sinSummonChanceIncrement);
-            return $"SUMMON CHANCE RISES ({Mathf.RoundToInt(_summonChance * 100)}%)";
+            return $"SIN CHANCE {Mathf.RoundToInt(_summonChance * 100)}%";
         }
 
         private SinBossConfig PickWeighted(List<SinBossConfig> candidates)
@@ -156,12 +156,12 @@ namespace SinWheel
             {
                 _ctx.Wallet.AddRunCoins(cfg.defeatCoins);
                 _ctx.Wallet.AddGems(cfg.defeatGems);
-                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} REPENTS!  +{cfg.defeatCoins} COINS  +{cfg.defeatGems} GEMS", Palette.Gold);
+                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} REPENTS +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
             }
             else
             {
                 _ctx.Wallet.AddRunCoins(cfg.surviveCoins);
-                _ctx.Hud?.Toast($"YOU OUTLASTED {cfg.displayName.ToUpperInvariant()}  +{cfg.surviveCoins} COINS", Palette.Bone);
+                _ctx.Hud?.Toast($"OUTLASTED {cfg.displayName.ToUpperInvariant()} +{cfg.surviveCoins}C", Palette.Bone);
             }
 
             _ctx.Analytics.Track("boss_encounter_end",
