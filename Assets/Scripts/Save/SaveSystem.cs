@@ -44,6 +44,7 @@ namespace SinWheel
 
         // Narrative + settings
         public float musicVolume = Music.DefaultVolume;
+        public bool tutorialSeen;
         public int consecutiveInstantBanks;
         public List<CountEntry> sinEncounters = new List<CountEntry>();
         public List<CountEntry> sinDefeats = new List<CountEntry>();

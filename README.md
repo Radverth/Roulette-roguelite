@@ -41,6 +41,30 @@ different clocks (design: `Assets/Resources/Art/Loop/LOOP_DESIGN.md`):
 7. A run ends when resilience hits zero — unbanked coins forfeit — or when the
    player banks out.
 
+### How often do sins appear?
+
+The summon wedge is 5 of 66 weight on the starting ring — **7.6% of spins** —
+and landing it rolls `sinSummonBaseChance + noticeFill` (0.15 up to a 0.95 cap).
+Separately, a full Notice meter forces a summon on the next risk wedge, and risk
+wedges are **28.8%** of the starting ring. After any encounter ends the house
+looks away for `summonGraceSpins` spins, so sins stay events rather than the
+default state.
+
+Simulated over a 40-spin run: **~1.2 encounters**, each 11–14 spins — roughly a
+third of a run spent inside a sin. (Before the grace period and the notice
+retune it was ~1.8 encounters, or over half the run, which is what the first
+playtest ran into.) All five knobs — `sinSummonBaseChance`, `noticePerSpin`,
+`noticeOnEncounterEnd`, `summonGraceSpins` and the summon wedge's `weight` —
+live in JSON.
+
+### How to play
+
+A nine-plate wizard covers the debt, the spin, the chain, the Notice, the
+quota, the tithe, the seven and the Forge. It runs automatically before a
+player's first spin and is available afterwards from **HOW TO PLAY** on the
+menu. The copy is in `Assets/Resources/Config/tutorial.json` — keep body lines
+to 24 characters and titles to 12, or they overflow the plate.
+
 ### The Forge
 
 Between runs, three cards: **Add** a wedge, **Strike** one permanently, or

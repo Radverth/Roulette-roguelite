@@ -70,7 +70,7 @@ namespace SinWheel
 
         /// <summary>Status line for the encounter strip.</summary>
         public virtual string StatusText(BossEncounter encounter) =>
-            $"{encounter.SpinsRemaining} SPINS LEFT";
+            "ENDURE";
 
         public string BreakHint => Cfg.breakHint ?? "";
 
@@ -125,7 +125,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"RESIST {encounter.Resist}/{Cfg.resistThreshold} - {encounter.SpinsRemaining} LEFT";
+            $"RESIST {encounter.Resist}/{Cfg.resistThreshold}";
     }
 
     /// <summary>
@@ -149,7 +149,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"TITHE TO ESCAPE - {encounter.SpinsRemaining} LEFT";
+            "TITHE TO ESCAPE";
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"HUMILITY {encounter.BreakProgress}/{Cfg.breakTarget} - {encounter.SpinsRemaining} LEFT";
+            $"HUMILITY {encounter.BreakProgress}/{Cfg.breakTarget}";
     }
 
     /// <summary>
@@ -233,7 +233,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"POOL {encounter.GreedPool} - {encounter.SpinsRemaining} LEFT";
+            $"POOL {encounter.GreedPool}";
     }
 
     /// <summary>
@@ -278,7 +278,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"WOUNDS {encounter.BreakProgress}/{Cfg.breakTarget} - {encounter.SpinsRemaining} LEFT";
+            $"WOUNDS {encounter.BreakProgress}/{Cfg.breakTarget}";
     }
 
     /// <summary>
@@ -307,7 +307,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"FIND SOMETHING NEW - {encounter.SpinsRemaining} LEFT";
+            "FIND SOMETHING NEW";
     }
 
     /// <summary>
@@ -342,7 +342,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"REPEAT A WEDGE - {encounter.SpinsRemaining} LEFT";
+            "REPEAT A WEDGE";
     }
 
     public static class BossModifierFactory

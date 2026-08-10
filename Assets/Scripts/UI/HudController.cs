@@ -53,6 +53,7 @@ namespace SinWheel
         private Image _bossBreakGlyph;
         private PixelText _bossName;
         private PixelText _bossStatus;
+        private PixelText _bossSpinsLeft;
 
         private GameObject _voiceSlot;
         private Image _voicePlate;
@@ -78,6 +79,7 @@ namespace SinWheel
         private RectTransform _upgradesContent;
 
         private ForgeScreen _forge;
+        private TutorialScreen _tutorial;
         private Coroutine _shakeRoutine;
 
         public HudController(GameContext ctx)
@@ -123,6 +125,31 @@ namespace SinWheel
             BuildMainMenu();
 
             _forge = new ForgeScreen(_ctx, _root, () => _ctx.Game.StartRun());
+            _tutorial = new TutorialScreen(_ctx, _root, OnTutorialClosed);
+        }
+
+        /// <summary>
+        /// Reading the rules on a first run leads straight into it; opening the
+        /// wizard from the menu returns to the menu.
+        /// </summary>
+        private void OnTutorialClosed()
+        {
+            if (_tutorialFromMenu)
+            {
+                _tutorialFromMenu = false;
+                ShowMainMenu();
+                return;
+            }
+            PlayFromMenu();
+        }
+
+        private bool _tutorialFromMenu;
+
+        private void OpenTutorialFromMenu()
+        {
+            _tutorialFromMenu = true;
+            _menuPanel.SetActive(false);
+            _tutorial.Open();
         }
 
         // --- Construction ---
@@ -165,10 +192,10 @@ namespace SinWheel
         private void BuildPressureRow()
         {
             _noticeEye = UiFactory.CreateSpriteImage(_shakeRoot, "NoticeEye", "Loop/notice_eye_0", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)_noticeEye.transform, Top, new Vector2(-82f, -65f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)_noticeEye.transform, Top, new Vector2(-80f, -64f), new Vector2(16f, 16f));
 
             var track = UiFactory.CreateSpriteImage(_shakeRoot, "NoticeTrack", "Loop/notice_track", new Vector2(64f, 10f));
-            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-40f, -65f), new Vector2(64f, 10f));
+            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-38f, -64f), new Vector2(64f, 10f));
 
             var fill = UiFactory.CreateRect(track.transform, "Fill");
             UiFactory.Stretch(fill, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -180,7 +207,7 @@ namespace SinWheel
             _noticeFill.raycastTarget = false;
 
             var streakFrame = UiFactory.CreateSpriteImage(_shakeRoot, "StreakFrame", "Loop/streak_frame", new Vector2(56f, 14f));
-            UiFactory.Place((RectTransform)streakFrame.transform, Top, new Vector2(22f, -65f), new Vector2(56f, 14f));
+            UiFactory.Place((RectTransform)streakFrame.transform, Top, new Vector2(22f, -64f), new Vector2(56f, 14f));
 
             for (int i = 0; i < StreakPips; i++)
             {
@@ -191,7 +218,7 @@ namespace SinWheel
             }
 
             _multiplierBadge = UiFactory.CreateSpriteImage(_shakeRoot, "MultBadge", "Loop/multiplier_badge", new Vector2(28f, 14f));
-            UiFactory.Place((RectTransform)_multiplierBadge.transform, Top, new Vector2(68f, -65f), new Vector2(28f, 14f));
+            UiFactory.Place((RectTransform)_multiplierBadge.transform, Top, new Vector2(68f, -64f), new Vector2(28f, 14f));
             _multiplierText = PixelText.Create(_multiplierBadge.transform, "Mult", "X1", Palette.Bone);
             UiFactory.Place((RectTransform)_multiplierText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
         }
@@ -200,19 +227,19 @@ namespace SinWheel
         private void BuildQuotaRow()
         {
             var track = UiFactory.CreateSpriteImage(_shakeRoot, "QuotaTrack", "Loop/quota_track", new Vector2(96f, 12f));
-            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-38f, -79f), new Vector2(96f, 12f));
+            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-40f, -80f), new Vector2(96f, 12f));
 
             _quotaMarker = UiFactory.CreateSpriteImage(track.transform, "Marker", "Loop/quota_marker", new Vector2(9f, 16f));
             UiFactory.Place((RectTransform)_quotaMarker.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(9f, 16f));
 
             _quotaText = PixelText.Create(_shakeRoot, "QuotaText", "", Palette.Dim, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_quotaText.transform, Top, new Vector2(14f, -79f), Vector2.zero);
+            UiFactory.Place((RectTransform)_quotaText.transform, Top, new Vector2(14f, -80f), Vector2.zero);
         }
 
         private void BuildBossStrip()
         {
             var strip = UiFactory.CreateNineSlice(_shakeRoot, "BossStrip", "UI/panel_danger");
-            UiFactory.Place((RectTransform)strip.transform, Top, new Vector2(0f, -99f), new Vector2(172f, 32f));
+            UiFactory.Place((RectTransform)strip.transform, Top, new Vector2(0f, -104f), new Vector2(172f, 32f));
             _bossStrip = strip.gameObject;
 
             _bossSigil = UiFactory.CreateSpriteImage(strip.transform, "Sigil", null, new Vector2(24f, 24f));
@@ -221,11 +248,16 @@ namespace SinWheel
             _bossName = PixelText.Create(strip.transform, "Name", "", Palette.Gold, 1, PxAlign.Left);
             UiFactory.Place((RectTransform)_bossName.transform, new Vector2(0f, 0.5f), new Vector2(34f, 7f), Vector2.zero);
 
+            // Break progress on the left, spins remaining on the right: two
+            // short strings instead of one long one that ran into the glyph.
             _bossStatus = PixelText.Create(strip.transform, "Status", "", Palette.Bone, 1, PxAlign.Left);
             UiFactory.Place((RectTransform)_bossStatus.transform, new Vector2(0f, 0.5f), new Vector2(34f, -4f), Vector2.zero);
 
+            _bossSpinsLeft = PixelText.Create(strip.transform, "SpinsLeft", "", Palette.Dim, 1, PxAlign.Right);
+            UiFactory.Place((RectTransform)_bossSpinsLeft.transform, new Vector2(1f, 0.5f), new Vector2(-8f, -4f), Vector2.zero);
+
             _bossBreakGlyph = UiFactory.CreateSpriteImage(strip.transform, "BreakGlyph", null, new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)_bossBreakGlyph.transform, new Vector2(1f, 0.5f), new Vector2(-14f, 0f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)_bossBreakGlyph.transform, new Vector2(1f, 0.5f), new Vector2(-16f, 7f), new Vector2(16f, 16f));
 
             _bossStrip.SetActive(false);
         }
@@ -233,30 +265,30 @@ namespace SinWheel
         private void BuildWheelArea()
         {
             var container = UiFactory.CreateRect(_shakeRoot, "WheelArea");
-            UiFactory.Place(container, Top, new Vector2(0f, -180f), new Vector2(160f, 160f));
+            UiFactory.Place(container, Top, new Vector2(0f, -197f), new Vector2(160f, 160f));
             Wheel = new WheelController(_ctx, container);
 
             _statusLine = PixelText.Create(_shakeRoot, "StatusLine", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_statusLine.transform, Top, new Vector2(0f, -252f), Vector2.zero);
+            UiFactory.Place((RectTransform)_statusLine.transform, Top, new Vector2(0f, -266f), Vector2.zero);
         }
 
         private void BuildBottomBar()
         {
             _spinButton = UiFactory.CreatePixelButton(_shakeRoot, "SpinButton", "SPIN", true, 2,
                 () => _ctx.Spin.RequestSpin(), out _spinLabel);
-            UiFactory.Place((RectTransform)_spinButton.transform, Top, new Vector2(0f, -274f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)_spinButton.transform, Top, new Vector2(0f, -287f), new Vector2(96f, 32f));
 
             _titheButton = UiFactory.CreatePixelButton(_shakeRoot, "TitheButton", "TITHE", false, 1,
-                () => _ctx.Game.Tithe(), out _, "Loop/button_tithe");
-            UiFactory.Place((RectTransform)_titheButton.transform, Top, new Vector2(-58f, -300f), new Vector2(48f, 16f));
+                () => _ctx.Game.Tithe(), out _, "Loop/button_tithe", 7f);
+            UiFactory.Place((RectTransform)_titheButton.transform, Top, new Vector2(-58f, -313f), new Vector2(48f, 16f));
 
             _bankButton = UiFactory.CreatePixelButton(_shakeRoot, "BankButton", "BANK", false, 1,
                 () => _ctx.Game.BankAndEndRun(), out _);
-            UiFactory.Place((RectTransform)_bankButton.transform, Top, new Vector2(0f, -300f), new Vector2(48f, 16f));
+            UiFactory.Place((RectTransform)_bankButton.transform, Top, new Vector2(0f, -313f), new Vector2(48f, 16f));
 
             var upgrades = UiFactory.CreatePixelButton(_shakeRoot, "UpgradesButton", "UPGRADE", false, 1,
                 ToggleUpgradesPanel, out _);
-            UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(58f, -300f), new Vector2(48f, 16f));
+            UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(58f, -313f), new Vector2(48f, 16f));
         }
 
         private void BuildVoiceSlot()
@@ -264,7 +296,7 @@ namespace SinWheel
             // Slides in over the wheel, never over the spin button; the player
             // can always spin through it. Auto-dismisses.
             _voiceSlot = UiFactory.CreateRect(_frame, "VoiceSlot").gameObject;
-            UiFactory.Place((RectTransform)_voiceSlot.transform, Top, new Vector2(0f, -145f), new Vector2(160f, 64f));
+            UiFactory.Place((RectTransform)_voiceSlot.transform, Top, new Vector2(0f, -162f), new Vector2(160f, 64f));
 
             _voicePlate = UiFactory.CreateSpriteImage(_voiceSlot.transform, "Plate", null, new Vector2(160f, 64f));
             UiFactory.Place((RectTransform)_voicePlate.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160f, 64f));
@@ -310,15 +342,21 @@ namespace SinWheel
             cardButton.onClick.AddListener(PlayFromMenu);
 
             var play = UiFactory.CreatePixelButton(frame, "Play", "PLAY", true, 2, PlayFromMenu, out _);
-            UiFactory.Place((RectTransform)play.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)play.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -20f), new Vector2(96f, 32f));
+
+            // Scale 2 keeps the 48x16 sprite on an integer multiple; the label
+            // auto-shrinks to fit inside it.
+            var howTo = UiFactory.CreatePixelButton(frame, "HowTo", "HOW TO PLAY", false, 2,
+                OpenTutorialFromMenu, out _);
+            UiFactory.Place((RectTransform)howTo.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -56f), new Vector2(96f, 32f));
 
             _menuDebt = PixelText.Create(frame, "Debt", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_menuDebt.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -58f), Vector2.zero);
+            UiFactory.Place((RectTransform)_menuDebt.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -84f), Vector2.zero);
 
             var musicLabel = PixelText.Create(frame, "MusicLabel", "MUSIC", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -84f), Vector2.zero);
+            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -104f), Vector2.zero);
 
-            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -84f),
+            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -104f),
                 _ctx.Save.Data.musicVolume, v =>
                 {
                     Music.SetVolume(v);
@@ -326,7 +364,7 @@ namespace SinWheel
                 });
 
             _menuFragments = PixelText.Create(frame, "Fragments", "", Palette.Dim);
-            UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -112f), Vector2.zero);
+            UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -126f), Vector2.zero);
 
             _menuPanel.SetActive(false);
         }
@@ -335,6 +373,15 @@ namespace SinWheel
         {
             _menuPanel.SetActive(false);
             _ctx.Save.Persist(); // volume changes commit when leaving the menu
+
+            // First time out, the rules come before the wheel.
+            if (!_ctx.Save.Data.tutorialSeen)
+            {
+                _tutorialFromMenu = false;
+                _tutorial.Open();
+                return;
+            }
+
             _ctx.Game.StartRun();
         }
 
@@ -439,7 +486,7 @@ namespace SinWheel
             for (int i = _upgradesContent.childCount - 1; i >= 0; i--)
                 Object.Destroy(_upgradesContent.GetChild(i).gameObject);
 
-            float y = -4f;
+            float y = -26f;
             foreach (var cfg in _ctx.Config.Upgrades.upgrades)
             {
                 if (cfg.category == "sin_resist" && !IsSinUnlocked(cfg.sinId)) continue;
@@ -638,7 +685,7 @@ namespace SinWheel
 
         public void ShowOutcome(OutcomeResult result)
         {
-            SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -164f), 1.2f);
+            SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -181f), 1.2f);
 
             switch (result.Type)
             {
@@ -666,7 +713,7 @@ namespace SinWheel
         public void ShowStreakBreak()
         {
             var burst = UiFactory.CreateSpriteImage(_frame, "StreakBreak", "Loop/streak_break", new Vector2(32f, 32f));
-            UiFactory.Place((RectTransform)burst.transform, Top, new Vector2(22f, -65f), new Vector2(32f, 32f));
+            UiFactory.Place((RectTransform)burst.transform, Top, new Vector2(22f, -64f), new Vector2(32f, 32f));
             _ctx.CoroutineHost.StartCoroutine(BurstAndFade(burst, 0.4f));
             Haptics.Heavy();
             Sfx.Damage();
@@ -689,7 +736,7 @@ namespace SinWheel
 
         public void Toast(string message, Color color)
         {
-            SpawnFloatingText(message, color, 1, new Vector2(0f, -118f), 1.8f);
+            SpawnFloatingText(message, color, 1, new Vector2(0f, -135f), 1.8f);
         }
 
         public void OnRunStarted()
@@ -714,6 +761,7 @@ namespace SinWheel
         public void OnBossUpdated(BossEncounter encounter)
         {
             _bossStatus.Text = encounter.Modifier.StatusText(encounter);
+            _bossSpinsLeft.Text = $"{encounter.SpinsRemaining} LEFT";
         }
 
         public void OnBossEnded()

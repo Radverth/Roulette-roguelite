@@ -14,11 +14,20 @@ namespace SinWheel
     public sealed class SinBossSystem
     {
         private readonly GameContext _ctx;
+        private int _spinOfLastEncounterEnd = int.MinValue / 2;
 
         public BossEncounter Encounter { get; private set; }
         public bool EncounterActive => Encounter != null;
 
         public float CurrentRewardMultiplier => Encounter?.RewardMultiplier ?? 1f;
+
+        /// <summary>
+        /// The house gives you a few spins of quiet after an encounter. Without
+        /// it, back-to-back sins make being hunted the default state rather
+        /// than an event.
+        /// </summary>
+        public bool InGracePeriod =>
+            _ctx.Game.SpinsThisRun - _spinOfLastEncounterEnd <= _ctx.Config.Tuning.summonGraceSpins;
 
         public SinBossSystem(GameContext ctx)
         {
@@ -28,6 +37,7 @@ namespace SinWheel
         public void ResetForRun()
         {
             Encounter = null;
+            _spinOfLastEncounterEnd = int.MinValue / 2;
         }
 
         public List<SinBossConfig> UnlockedSins()
@@ -49,6 +59,8 @@ namespace SinWheel
             var candidates = UnlockedSins();
             if (candidates.Count == 0)
                 return "SOMETHING WATCHES";
+            if (InGracePeriod)
+                return "THE HOUSE LOOKS AWAY";
 
             // Summon chance is the base plus however far the Notice has filled.
             var t = _ctx.Config.Tuning;
@@ -68,7 +80,7 @@ namespace SinWheel
         /// </summary>
         public bool TryForcedSummon(SegmentConfig landed)
         {
-            if (EncounterActive || !landed.IsRisk || !_ctx.Notice.IsFull) return false;
+            if (EncounterActive || !landed.IsRisk || !_ctx.Notice.IsFull || InGracePeriod) return false;
 
             var candidates = UnlockedSins();
             if (candidates.Count == 0) return false;
@@ -185,6 +197,7 @@ namespace SinWheel
             _ctx.Analytics.Track("boss_encounter_end",
                 "sin", Encounter.Config.id, "outcome", reason, "spins", Encounter.SpinsElapsed);
             Encounter = null;
+            _spinOfLastEncounterEnd = _ctx.Game.SpinsThisRun;
             _ctx.Hud?.OnBossEnded();
             _ctx.Ring.Rebuild();
         }
@@ -226,6 +239,7 @@ namespace SinWheel
                 "sin", cfg.id, "outcome", defeated ? "defeated" : "survived", "spins", spins);
 
             Encounter = null;
+            _spinOfLastEncounterEnd = _ctx.Game.SpinsThisRun;
             _ctx.Hud?.OnBossEnded();
             _ctx.Ring.Rebuild(); // the splices leave with it
             Sfx.LevelUp();
