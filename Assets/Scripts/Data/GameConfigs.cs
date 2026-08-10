@@ -158,7 +158,7 @@ namespace SinWheel
         public float spinAnimDuration = 2.2f;
         public int baseMaxHp = 100;
 
-        public float sinSummonBaseChance = 0.25f;
+        public float sinSummonBaseChance = 0.15f;
         public float sinSummonChanceIncrement = 0.15f;
         public float sinSummonChanceMax = 0.95f;
 
@@ -174,13 +174,15 @@ namespace SinWheel
 
         // --- Notice: the escalation made visible (8 segments) ---
         public float noticeSegments = 8f;
-        public float noticePerSpin = 0.35f;
+        public float noticePerSpin = 0.25f;
         public float noticePerTithe = 1f;
         public float noticeHighPurseThreshold = 200f;
         public float noticeHighPurseBonus = 0.25f;
         public float noticeOnSinBroken = -3f;
         public float noticeOnHumility = -1f;
-        public float noticeOnEncounterEnd = -2f;
+        public float noticeOnEncounterEnd = -4f;
+        /// <summary>Spins of quiet the house grants after an encounter ends.</summary>
+        public int summonGraceSpins = 5;
 
         // --- Streak: tension on every spin ---
         public int streakStartsAt = 3;

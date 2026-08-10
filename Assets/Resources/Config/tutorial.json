@@ -1,0 +1,59 @@
+{
+  "_note": "How-to-play wizard. Upper case only, and only characters in the 5x7 font charset: A-Z 0-9 / - . , ' ! & + : % ?. Keep body lines to 24 characters and titles to 12, or they will not fit the plate.",
+  "pages": [
+    {
+      "title": "THE DEBT",
+      "sprite": "Narrative/mask_croupier",
+      "spriteSize": 48,
+      "body": "YOU OWE THE HOUSE.\nTHE WHEEL IS HOW YOU\nPAY IT DOWN.\nTHE CROUPIER ONLY\nTURNS IT."
+    },
+    {
+      "title": "THE SPIN",
+      "sprite": "Icons/ui_spin_charge",
+      "spriteSize": 32,
+      "body": "TAP SPIN.\nTHE TICKER LANDS ON A\nWEDGE.\nGOLD PAYS. RED TAKES."
+    },
+    {
+      "title": "THE CHAIN",
+      "sprite": "Loop/streak_pip_hot",
+      "spriteSize": 32,
+      "body": "3 REWARDS IN A ROW\nSTARTS A CHAIN.\nEACH ONE ADDS +0.25X,\nUP TO 3X.\nANY RISK WIPES IT."
+    },
+    {
+      "title": "THE NOTICE",
+      "sprite": "Loop/notice_eye_3",
+      "spriteSize": 32,
+      "body": "THE EYE FILLS AS YOU\nSPIN AND TITHE.\nWHEN FULL, THE NEXT\nRISK WEDGE SUMMONS\nA SIN."
+    },
+    {
+      "title": "THE QUOTA",
+      "sprite": "Loop/debt_seal_owed",
+      "spriteSize": 32,
+      "body": "EACH RUN OWES A QUOTA.\nPAY IT: THE DEBT FALLS.\nMISS IT: THE DEBT\nGROWS AND THE HOUSE\nADDS A WOUND."
+    },
+    {
+      "title": "THE TITHE",
+      "sprite": "Loop/button_tithe",
+      "spriteSize": 48,
+      "body": "TITHE PAYS HALF YOUR\nPURSE AND YOU KEEP\nSPINNING - BUT THE EYE\nOPENS WIDER.\nBANK TAKES ALL."
+    },
+    {
+      "title": "THE SEVEN",
+      "sprite": "Sins/sigil_sloth",
+      "spriteSize": 32,
+      "body": "SINS COME BECAUSE YOU\nARE DOING WELL.\nEACH CAN BE BROKEN -\nTHE STRIP SAYS HOW.\nBREAK IT, KEEP THE BOON."
+    },
+    {
+      "title": "THE FORGE",
+      "sprite": "Loop/action_add",
+      "spriteSize": 32,
+      "body": "BETWEEN RUNS, TAKE ONE\nOF THREE CARDS: ADD,\nSTRIKE OR TEMPER.\nTHE RING IS YOUR BUILD."
+    },
+    {
+      "title": "WALK AWAY",
+      "sprite": "Narrative/mask_croupier",
+      "spriteSize": 48,
+      "body": "RESILIENCE HITS ZERO\nAND THE PURSE IS LOST.\nKNOW WHEN TO WALK.\nSIT."
+    }
+  ]
+}

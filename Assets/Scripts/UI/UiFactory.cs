@@ -73,7 +73,8 @@ namespace SinWheel
         /// an integer factor to keep the grid.
         /// </summary>
         public static Button CreatePixelButton(Transform parent, string name, string label, bool primary,
-            int scale, Action onClick, out PixelText labelText, string spriteOverride = null)
+            int scale, Action onClick, out PixelText labelText, string spriteOverride = null,
+            float labelOffsetX = 0f)
         {
             var rt = CreateRect(parent, name);
             rt.sizeDelta = new Vector2(48 * scale, 16 * scale);
@@ -111,13 +112,16 @@ namespace SinWheel
             }
 
             // Shrink the label scale until the text fits inside the button
-            // (6px advance per glyph, 8px of horizontal padding).
+            // (6px advance per glyph, 8px of horizontal padding). An offset
+            // label has less room, because part of the face is already spoken
+            // for by artwork baked into the sprite.
+            float usableWidth = 48f * scale - 8f - Mathf.Abs(labelOffsetX) * 2f;
             int labelScale = scale;
-            while (labelScale > 1 && (label?.Length ?? 0) * 6 * labelScale > 48 * scale - 8)
+            while (labelScale > 1 && (label?.Length ?? 0) * 6 * labelScale > usableWidth)
                 labelScale--;
 
             labelText = PixelText.Create(rt, "Label", label, Palette.Bone, labelScale, PxAlign.Center);
-            Place((RectTransform)labelText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
+            Place((RectTransform)labelText.transform, new Vector2(0.5f, 0.5f), new Vector2(labelOffsetX, 0f), Vector2.zero);
 
             if (onClick != null)
                 button.onClick.AddListener(() => onClick());
