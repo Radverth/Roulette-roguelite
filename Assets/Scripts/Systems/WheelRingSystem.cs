@@ -159,8 +159,19 @@ namespace SinWheel
                 }
             }
 
+            // The descent and the Marks each put wedges of their own in the ring.
+            int houseWedges = (_ctx.Tables?.ExtraRiskWedges ?? 0) + (_ctx.Marks?.ExtraRiskWedges ?? 0);
+            for (int i = 0; i < houseWedges; i++)
+            {
+                var template = Template("damage_small");
+                if (template == null) break;
+                var wedge = template.Clone();
+                wedge.id = "damage_house";
+                ring.Insert(Mathf.Min(ring.Count, 5 + i * 4), wedge);
+            }
+
             if (_ctx.Bosses != null && _ctx.Bosses.EncounterActive)
-                ring = _ctx.Bosses.Encounter.Modifier.ModifySegments(ring);
+                ring = _ctx.Bosses.ModifySegments(ring);
 
             if (_shuffleOrder != null && _shuffleOrder.Length == ring.Count)
             {

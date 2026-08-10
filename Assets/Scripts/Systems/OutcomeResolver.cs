@@ -23,7 +23,8 @@ namespace SinWheel
 
             float rewardMult = ctx.Buffs.RewardMultiplier
                 * ctx.Bosses.CurrentRewardMultiplier
-                * ctx.Streak.Multiplier;
+                * ctx.Streak.Multiplier
+                * ctx.Tables.RewardMultiplier;
             rewardMult = ctx.Bosses.ModifyRewardMultiplier(rewardMult);
 
             switch (seg.ParsedType)
@@ -33,6 +34,7 @@ namespace SinWheel
                     int gain = Mathf.RoundToInt(seg.EffectiveAmount * rewardMult);
                     gain = ctx.Bosses.ModifyCoinGain(gain); // Greed's tithe hook
                     ctx.Wallet.AddRunCoins(gain);
+                    ctx.Tables.RecordCoinsEarned(gain);
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,
@@ -74,6 +76,7 @@ namespace SinWheel
                     ctx.Notice.OnHumility();
                     int gain = Mathf.RoundToInt(seg.EffectiveAmount * rewardMult);
                     ctx.Wallet.AddRunCoins(gain);
+                    ctx.Tables.RecordCoinsEarned(gain);
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,

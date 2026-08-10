@@ -24,7 +24,8 @@ namespace SinWheel
         public int PaidThisRun { get; private set; }
 
         public int Debt => _ctx.Save.Data.debt;
-        public int Quota => _ctx.Save.Data.quota;
+        /// <summary>Mark I raises what the house expects, without touching the stored figure.</summary>
+        public int Quota => Mathf.RoundToInt(_ctx.Save.Data.quota * _ctx.Marks.QuotaMultiplier);
         public bool QuotaMet => PaidThisRun >= Quota;
         public float QuotaFill => Mathf.Clamp01(PaidThisRun / Mathf.Max(1f, Quota));
 
@@ -58,10 +59,11 @@ namespace SinWheel
             var data = _ctx.Save.Data;
             var t = _ctx.Config.Tuning;
 
+            int quota = Quota;
             data.lastRunPaid = PaidThisRun;
-            data.lastRunQuota = data.quota; // the ledger reports the quota that was in force
+            data.lastRunQuota = quota; // the ledger reports the quota that was in force
 
-            if (PaidThisRun >= data.quota)
+            if (PaidThisRun >= quota)
             {
                 data.debt = Mathf.Max(0, data.debt - PaidThisRun);
                 data.quota = Mathf.Max(t.quotaBase, Mathf.RoundToInt(data.quota * t.quotaRelief));
@@ -70,7 +72,7 @@ namespace SinWheel
                 return DebtOutcome.Reduced;
             }
 
-            int shortfall = data.quota - PaidThisRun;
+            int shortfall = quota - PaidThisRun;
             data.debt += shortfall;
             data.quota = Mathf.RoundToInt(data.quota * t.quotaGrowth);
             data.penaltyRiskWedges = Mathf.Min(t.maxPenaltyRiskWedges, data.penaltyRiskWedges + 1);

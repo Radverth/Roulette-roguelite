@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace SinWheel
@@ -14,8 +15,10 @@ namespace SinWheel
         public bool RunActive { get; private set; }
         public int SpinsThisRun;
         public DebtOutcome LastDebtOutcome { get; private set; } = DebtOutcome.Owed;
+        public List<MarkConfig> LastMarksEarned { get; private set; } = new List<MarkConfig>();
 
         private bool _greedNoticedThisRun;
+        private bool _sideTableOffered;
 
         public GameManager(GameContext ctx)
         {
@@ -34,14 +37,18 @@ namespace SinWheel
             _ctx.Notice.ResetForRun();
             _ctx.Streak.ResetForRun();
             _ctx.Debt.ResetForRun();
+            _ctx.Tables.ResetForRun();
+            _ctx.Interludes.ResetForRun();
             _ctx.Ring.ClearShuffle(); // also rebuilds the ring for the new run
 
             SpinsThisRun = 0;
             _greedNoticedThisRun = false;
+            _sideTableOffered = false;
             RunActive = true;
 
             _ctx.Analytics.Track("run_start",
-                "level", _ctx.Xp.Level, "quota", _ctx.Debt.Quota, "ring", _ctx.Ring.Count);
+                "level", _ctx.Xp.Level, "quota", _ctx.Debt.Quota, "ring", _ctx.Ring.Count,
+                "marks", _ctx.Marks.EarnedCount);
             _ctx.Hud?.OnRunStarted();
 
             // The Croupier speaks at run start and run end, nowhere else.
@@ -54,6 +61,24 @@ namespace SinWheel
             if (RunActive && _ctx.Health.IsDead)
             {
                 EndRun(banked: false, bankedAmount: 0);
+                return;
+            }
+
+            // The house has seen enough winnings to invite you deeper.
+            if (RunActive && _ctx.Tables.ShouldInvite())
+            {
+                _ctx.Tables.RaiseInvite();
+                _ctx.Hud?.ShowTableInvite();
+                return;
+            }
+
+            // The Side Table: a hand on the one dial the player otherwise only
+            // watches move, placed where the tension is highest.
+            if (RunActive && !_sideTableOffered
+                && _ctx.Notice.Fill >= _ctx.Interludes.Config.sideTableNoticeGate)
+            {
+                _sideTableOffered = true;
+                _ctx.Hud?.ShowInterlude(sideTable: true);
                 return;
             }
 
@@ -129,13 +154,17 @@ namespace SinWheel
             int purseAtEnd = banked ? bankedAmount : _ctx.Wallet.RunCoins;
 
             // Boss drop-off is the metric the sin difficulty curve is tuned on.
-            _ctx.Bosses.AbandonEncounter(banked ? "banked_out" : "died");
+            _ctx.Bosses.AbandonEncounters(banked ? "banked_out" : "died");
             _ctx.Narrative.ChooseRunEndQuote(banked, purseAtEnd);
 
             if (!banked)
                 _ctx.Wallet.ResetRun(); // unbanked winnings are forfeit
 
             LastDebtOutcome = _ctx.Debt.Settle();
+            LastMarksEarned = _ctx.Marks.CheckForNewMarks();
+
+            if (_ctx.Tables.CurrentTable > _ctx.Save.Data.deepestTable)
+                _ctx.Save.Data.deepestTable = _ctx.Tables.CurrentTable;
 
             _ctx.Save.Data.runsCompleted++;
             _ctx.Save.Persist();
@@ -143,7 +172,8 @@ namespace SinWheel
             _ctx.Analytics.Track("run_end",
                 "banked", banked, "amount", bankedAmount, "spins", SpinsThisRun,
                 "level", _ctx.Xp.Level, "paid", _ctx.Save.Data.lastRunPaid,
-                "quota_met", _ctx.Save.Data.lastRunMetQuota, "debt", _ctx.Debt.Debt);
+                "quota_met", _ctx.Save.Data.lastRunMetQuota, "debt", _ctx.Debt.Debt,
+                "table", _ctx.Tables.CurrentTable, "marks", _ctx.Marks.EarnedCount);
 
             _ctx.Hud?.ShowRunEnd(banked, bankedAmount, SpinsThisRun, LastDebtOutcome);
         }

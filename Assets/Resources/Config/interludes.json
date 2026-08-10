@@ -1,0 +1,16 @@
+{
+  "_note": "Seven mini-games, one per sin, seven distinct verbs. Two are offered at each table transition; skip is always available for a flat coin reward deliberately worse than an average play. Ten seconds maximum, one thumb, failure never ends the run.",
+  "offerCount": 2,
+  "skipReward": 40,
+  "sideTableNoticeGate": 0.75,
+  "sideTableNoticeRelief": 3,
+  "interludes": [
+    { "id": "ember", "sin": "wrath", "name": "THE EMBER", "verb": "STOP IT", "seconds": 6 },
+    { "id": "mirror", "sin": "pride", "name": "THE MIRROR", "verb": "REPEAT", "seconds": 10 },
+    { "id": "shell", "sin": "lust", "name": "THE SHELL", "verb": "FOLLOW", "seconds": 8 },
+    { "id": "feast", "sin": "gluttony", "name": "THE FEAST", "verb": "TAKE", "seconds": 10 },
+    { "id": "toll", "sin": "greed", "name": "THE TOLL", "verb": "TIME IT", "seconds": 8 },
+    { "id": "vigil", "sin": "sloth", "name": "THE VIGIL", "verb": "HOLD IT", "seconds": 7 },
+    { "id": "understudy", "sin": "envy", "name": "THE UNDERSTUDY", "verb": "SPOT IT", "seconds": 8 }
+  ]
+}

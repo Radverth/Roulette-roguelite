@@ -5,21 +5,35 @@ using UnityEngine;
 namespace SinWheel
 {
     /// <summary>
-    /// Owns sin summoning and the active encounter. Pressure is the Notice
-    /// meter now: it rises with spins, tithes and a fat purse, and when it
-    /// fills, the next risk wedge is a certainty rather than a coin flip.
-    /// Bosses unlock by level, then get picked weighted-random so returning
-    /// players face variety instead of a fixed order.
+    /// Owns sin summoning and the active encounters. Pressure is the Notice
+    /// meter: it rises with spins, tithes and a fat purse, and when it fills the
+    /// next risk wedge is a certainty rather than a coin flip.
+    ///
+    /// From Table IV the house sends them in pairs. The modifiers were built as
+    /// independent hooks, so stacking is a matter of folding over a list —
+    /// Greed taxing payouts while Lust reshuffles the ring composes for free.
     /// </summary>
     public sealed class SinBossSystem
     {
         private readonly GameContext _ctx;
+        private readonly List<BossEncounter> _encounters = new List<BossEncounter>();
         private int _spinOfLastEncounterEnd = int.MinValue / 2;
 
-        public BossEncounter Encounter { get; private set; }
-        public bool EncounterActive => Encounter != null;
+        public IReadOnlyList<BossEncounter> Encounters => _encounters;
+        public bool EncounterActive => _encounters.Count > 0;
 
-        public float CurrentRewardMultiplier => Encounter?.RewardMultiplier ?? 1f;
+        /// <summary>The one the strip names — whoever arrived first.</summary>
+        public BossEncounter Primary => _encounters.Count > 0 ? _encounters[0] : null;
+
+        public float CurrentRewardMultiplier
+        {
+            get
+            {
+                float m = 1f;
+                foreach (var e in _encounters) m *= e.RewardMultiplier;
+                return m;
+            }
+        }
 
         /// <summary>
         /// The house gives you a few spins of quiet after an encounter. Without
@@ -29,6 +43,8 @@ namespace SinWheel
         public bool InGracePeriod =>
             _ctx.Game.SpinsThisRun - _spinOfLastEncounterEnd <= _ctx.Config.Tuning.summonGraceSpins;
 
+        public bool AtSinCapacity => _encounters.Count >= _ctx.Tables.MaxActiveSins;
+
         public SinBossSystem(GameContext ctx)
         {
             _ctx = ctx;
@@ -36,21 +52,29 @@ namespace SinWheel
 
         public void ResetForRun()
         {
-            Encounter = null;
+            _encounters.Clear();
             _spinOfLastEncounterEnd = int.MinValue / 2;
+        }
+
+        public HashSet<string> ActiveSinIds()
+        {
+            var ids = new HashSet<string>();
+            foreach (var e in _encounters) ids.Add(e.Config.id);
+            return ids;
         }
 
         public List<SinBossConfig> UnlockedSins()
         {
+            var active = ActiveSinIds();
             return _ctx.Config.Sins.sins
-                .Where(s => s.implemented && s.unlockLevel <= _ctx.Xp.Level)
+                .Where(s => s.implemented && s.unlockLevel <= _ctx.Xp.Level && !active.Contains(s.id))
                 .ToList();
         }
 
         /// <summary>The wheel landed on the summon wedge. Returns the banner line.</summary>
         public string OnSummonSegmentHit()
         {
-            if (EncounterActive)
+            if (AtSinCapacity)
             {
                 float dmg = _ctx.Health.ApplyDamage(5f * _ctx.Buffs.DamageMultiplier);
                 return $"THE SIN STIRS -{Mathf.RoundToInt(dmg)} HP";
@@ -62,13 +86,13 @@ namespace SinWheel
             if (InGracePeriod)
                 return "THE HOUSE LOOKS AWAY";
 
-            // Summon chance is the base plus however far the Notice has filled.
             var t = _ctx.Config.Tuning;
             float chance = Mathf.Min(t.sinSummonChanceMax, t.sinSummonBaseChance + _ctx.Notice.Fill);
             if (_ctx.Rng.NextDouble() < chance)
             {
-                StartEncounter(PickWeighted(candidates));
-                return $"{Encounter.Config.displayName.ToUpperInvariant()} AWAKENS";
+                var cfg = PickWeighted(candidates);
+                StartEncounter(cfg);
+                return $"{cfg.displayName.ToUpperInvariant()} AWAKENS";
             }
 
             return $"SIN CHANCE {Mathf.RoundToInt(chance * 100)}%";
@@ -80,7 +104,7 @@ namespace SinWheel
         /// </summary>
         public bool TryForcedSummon(SegmentConfig landed)
         {
-            if (EncounterActive || !landed.IsRisk || !_ctx.Notice.IsFull || InGracePeriod) return false;
+            if (AtSinCapacity || !landed.IsRisk || !_ctx.Notice.IsFull || InGracePeriod) return false;
 
             var candidates = UnlockedSins();
             if (candidates.Count == 0) return false;
@@ -104,114 +128,144 @@ namespace SinWheel
 
         private void StartEncounter(SinBossConfig cfg)
         {
-            Encounter = new BossEncounter
+            var encounter = new BossEncounter
             {
                 Config = cfg,
                 Modifier = BossModifierFactory.Create(_ctx, cfg),
-                SpinsRemaining = cfg.durationSpins,
+                // Mark III: they outstay their welcome.
+                SpinsRemaining = cfg.durationSpins + _ctx.Marks.SinDurationBonus,
                 SpinsElapsed = 0
             };
+            _encounters.Add(encounter);
 
             int visits = SaveData.IncrementCount(_ctx.Save.Data.sinEncounters, cfg.id);
             _ctx.Narrative.BeginEncounter(cfg.id, visits >= 3);
             _ctx.Ring.Rebuild(); // the sin's splices join the wheel
 
-            _ctx.Analytics.Track("boss_encounter_start", "sin", cfg.id, "player_level", _ctx.Xp.Level);
-            _ctx.Hud?.OnBossStarted(Encounter);
+            _ctx.Analytics.Track("boss_encounter_start",
+                "sin", cfg.id, "player_level", _ctx.Xp.Level,
+                "table", _ctx.Tables.CurrentTable, "stacked", _encounters.Count);
+            _ctx.Hud?.OnBossStarted(encounter);
             Sfx.Boss();
             Haptics.Heavy();
         }
 
-        // --- Hooks called by SpinSystem / GameManager ---
+        // --- Hooks called by SpinSystem / GameManager / WheelRingSystem ---
+
+        public List<SegmentConfig> ModifySegments(List<SegmentConfig> ring)
+        {
+            foreach (var e in _encounters) ring = e.Modifier.ModifySegments(ring);
+            return ring;
+        }
 
         public float ModifyCooldown(float cooldown)
         {
-            float withBoss = EncounterActive ? Encounter.Modifier.ModifyCooldown(cooldown) : cooldown;
-            return Mathf.Max(0.1f, withBoss - _ctx.Run.SlothCooldownBonus);
+            foreach (var e in _encounters) cooldown = e.Modifier.ModifyCooldown(cooldown);
+            return Mathf.Max(0.1f, cooldown - _ctx.Run.SlothCooldownBonus - _ctx.Run.TableCooldownBonus);
         }
 
-        public float ModifyRewardMultiplier(float multiplier) =>
-            EncounterActive ? Encounter.Modifier.ModifyRewardMultiplier(multiplier) : multiplier;
+        public float ModifyRewardMultiplier(float multiplier)
+        {
+            foreach (var e in _encounters) multiplier = e.Modifier.ModifyRewardMultiplier(multiplier);
+            return multiplier;
+        }
 
-        public int ModifyCoinGain(int coins) =>
-            EncounterActive ? Encounter.Modifier.ModifyCoinGain(coins) : coins;
+        public int ModifyCoinGain(int coins)
+        {
+            foreach (var e in _encounters) coins = e.Modifier.ModifyCoinGain(coins);
+            return coins;
+        }
 
-        public float ModifyDamage(float damage) =>
-            EncounterActive ? Encounter.Modifier.ModifyDamage(damage) : damage;
+        public float ModifyDamage(float damage)
+        {
+            foreach (var e in _encounters) damage = e.Modifier.ModifyDamage(damage);
+            return damage;
+        }
 
         public void OnSpinStarted()
         {
-            if (EncounterActive) Encounter.Modifier.OnSpinStarted(Encounter);
+            foreach (var e in _encounters) e.Modifier.OnSpinStarted(e);
         }
 
         /// <summary>Gluttony's exit: paying mid-encounter buys your way out.</summary>
         public void OnTithe()
         {
-            if (!EncounterActive) return;
-            Encounter.Modifier.OnTithe(Encounter);
-            if (Encounter.Modifier.IsDefeated(Encounter))
-                EndEncounter(defeated: true);
+            foreach (var e in _encounters.ToList())
+            {
+                e.Modifier.OnTithe(e);
+                if (IsBroken(e)) EndEncounter(e, defeated: true);
+            }
         }
 
         public void OnSpinResolved(SegmentConfig landed)
         {
-            if (!EncounterActive) return;
-
-            Encounter.SpinsElapsed++;
-            Encounter.SpinsRemaining--;
-            Encounter.Modifier.OnSpinResolved(Encounter, landed);
-
-            if (Encounter.Modifier.IsDefeated(Encounter))
+            foreach (var encounter in _encounters.ToList())
             {
-                EndEncounter(defeated: true);
-                return;
-            }
-            if (Encounter.SpinsRemaining <= 0)
-            {
-                EndEncounter(defeated: false);
-                return;
+                encounter.SpinsElapsed++;
+                encounter.SpinsRemaining--;
+                encounter.Modifier.OnSpinResolved(encounter, landed);
+
+                if (IsBroken(encounter))
+                {
+                    EndEncounter(encounter, defeated: true);
+                    continue;
+                }
+                if (encounter.SpinsRemaining <= 0)
+                {
+                    EndEncounter(encounter, defeated: false);
+                    continue;
+                }
+
+                // The encounter has a middle: an occasional taunt, drawn without
+                // replacement so nothing repeats within one visit.
+                if (encounter == Primary && encounter.SpinsElapsed >= 2
+                    && encounter.SpinsElapsed % 3 == 0 && _ctx.Rng.NextDouble() < 0.6)
+                {
+                    string taunt = _ctx.Narrative.NextTaunt();
+                    if (taunt != null) _ctx.Hud?.ShowSpeech(encounter.Config.id, taunt);
+                }
             }
 
-            _ctx.Hud?.OnBossUpdated(Encounter);
-
-            // The encounter has a middle: an occasional taunt, drawn without
-            // replacement so nothing repeats within one visit.
-            if (Encounter.SpinsElapsed >= 2 && Encounter.SpinsElapsed % 3 == 0
-                && _ctx.Rng.NextDouble() < 0.6)
-            {
-                string taunt = _ctx.Narrative.NextTaunt();
-                if (taunt != null)
-                    _ctx.Hud?.ShowSpeech(Encounter.Config.id, taunt);
-            }
+            _ctx.Hud?.OnBossUpdated(Primary);
         }
 
-        /// <summary>Run died or banked out while a sin was active — log the drop-off.</summary>
-        public void AbandonEncounter(string reason)
+        /// <summary>At his table the Croupier disables breaks: they run their course.</summary>
+        private bool IsBroken(BossEncounter encounter)
         {
-            if (!EncounterActive) return;
+            if (_ctx.Tables.BreaksDisabled) return false;
+            return encounter.Modifier.IsDefeated(encounter);
+        }
 
-            if (reason == "banked_out")
+        /// <summary>Run died or banked out while sins were active — log the drop-off.</summary>
+        public void AbandonEncounters(string reason)
+        {
+            if (_encounters.Count == 0) return;
+
+            if (reason == "banked_out" && Primary != null)
                 _ctx.Narrative.SetRunEndQuote(
-                    _ctx.Narrative.EncounterEndLine(Encounter.Config.id, "player_fled"), 2);
+                    _ctx.Narrative.EncounterEndLine(Primary.Config.id, "player_fled"), 2);
 
-            _ctx.Analytics.Track("boss_encounter_end",
-                "sin", Encounter.Config.id, "outcome", reason, "spins", Encounter.SpinsElapsed);
-            Encounter = null;
+            foreach (var e in _encounters)
+                _ctx.Analytics.Track("boss_encounter_end",
+                    "sin", e.Config.id, "outcome", reason, "spins", e.SpinsElapsed);
+
+            _encounters.Clear();
             _spinOfLastEncounterEnd = _ctx.Game.SpinsThisRun;
             _ctx.Hud?.OnBossEnded();
             _ctx.Ring.Rebuild();
         }
 
-        private void EndEncounter(bool defeated)
+        private void EndEncounter(BossEncounter encounter, bool defeated)
         {
-            var encounter = Encounter;
             var cfg = encounter.Config;
             int spins = encounter.SpinsElapsed;
+            _encounters.Remove(encounter);
 
             if (defeated)
             {
                 encounter.Modifier.OnBroken(encounter);
                 _ctx.Wallet.AddRunCoins(cfg.defeatCoins);
+                _ctx.Tables.RecordCoinsEarned(cfg.defeatCoins);
                 _ctx.Wallet.AddGems(cfg.defeatGems);
                 _ctx.Notice.OnSinBroken();
                 _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} BROKEN +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
@@ -228,6 +282,7 @@ namespace SinWheel
             else
             {
                 _ctx.Wallet.AddRunCoins(cfg.surviveCoins);
+                _ctx.Tables.RecordCoinsEarned(cfg.surviveCoins);
                 _ctx.Hud?.Toast($"OUTLASTED {cfg.displayName.ToUpperInvariant()} +{cfg.surviveCoins}C", Palette.Bone);
             }
 
@@ -238,9 +293,18 @@ namespace SinWheel
             _ctx.Analytics.Track("boss_encounter_end",
                 "sin", cfg.id, "outcome", defeated ? "defeated" : "survived", "spins", spins);
 
-            Encounter = null;
-            _spinOfLastEncounterEnd = _ctx.Game.SpinsThisRun;
-            _ctx.Hud?.OnBossEnded();
+            if (_encounters.Count == 0)
+            {
+                _spinOfLastEncounterEnd = _ctx.Game.SpinsThisRun;
+                _ctx.Hud?.OnBossEnded();
+            }
+            else
+            {
+                // Whoever is left owns the strip now - but they have already
+                // announced themselves, so no second plate.
+                _ctx.Hud?.OnBossRefreshed(Primary);
+            }
+
             _ctx.Ring.Rebuild(); // the splices leave with it
             Sfx.LevelUp();
         }

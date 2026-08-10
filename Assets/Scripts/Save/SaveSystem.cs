@@ -55,6 +55,8 @@ namespace SinWheel
         public int debt = -1;              // -1 = uninitialised, seeded from tuning
         public int quota = -1;
         public int penaltyRiskWedges;      // one spliced in per unpaid run
+        public int marksEarned;
+        public int deepestTable = 1;
         public int forgeVisits;
         public int visitsSinceAddOffered;
         public int visitsSinceStrikeOffered;
