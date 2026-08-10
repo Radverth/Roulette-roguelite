@@ -65,6 +65,22 @@ namespace SinWheel
             _ctx.Save.Data.gems = Mathf.Max(0, _ctx.Save.Data.gems + amount);
         }
 
+        /// <summary>
+        /// Partial bank: convert part of the purse and keep spinning. Safety
+        /// now, bought with attention later — the caller raises Notice.
+        /// </summary>
+        public int TitheRunCoins(float percent, float bankingBonusMultiplier)
+        {
+            int taken = Mathf.RoundToInt(RunCoins * Mathf.Clamp01(percent / 100f));
+            if (taken <= 0) return 0;
+
+            RunCoins -= taken;
+            int banked = Mathf.RoundToInt(taken * Mathf.Max(1f, bankingBonusMultiplier));
+            _ctx.Save.Data.metaCoins += banked;
+            _ctx.Save.Data.totalBanked += banked;
+            return banked;
+        }
+
         /// <summary>Moves run coins into the persistent bank. Returns amount banked (with bonus).</summary>
         public int BankRunCoins(float bankingBonusMultiplier)
         {

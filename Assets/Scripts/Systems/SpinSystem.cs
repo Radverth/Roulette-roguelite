@@ -49,22 +49,24 @@ namespace SinWheel
         {
             if (!CanSpin) return;
 
-            List<SegmentConfig> segments = _ctx.Bosses.GetEffectiveSegments(_ctx.Config.Wheel.segments);
+            IReadOnlyList<SegmentConfig> ring = _ctx.Ring.Effective;
+            if (ring.Count == 0) return;
+
             _ctx.Bosses.OnSpinStarted(); // Gluttony charges its toll here
 
-            int index = RollWeighted(segments);
+            int index = RollWeighted(ring);
             State = SpinState.Spinning;
             _ctx.Game.SpinsThisRun++;
-            _ctx.Analytics.TrackSpin(index, segments[index].type, _ctx.Bosses.EncounterActive);
+            _ctx.Analytics.TrackSpin(index, ring[index].type, _ctx.Bosses.EncounterActive);
 
-            _ctx.Hud.Wheel.SpinTo(index, _ctx.Config.Tuning.spinAnimDuration,
-                () => Resolve(segments[index]));
+            var landed = ring[index];
+            _ctx.Hud.Wheel.SpinTo(index, _ctx.Config.Tuning.spinAnimDuration, () => Resolve(landed));
         }
 
-        private int RollWeighted(List<SegmentConfig> segments)
+        private int RollWeighted(IReadOnlyList<SegmentConfig> segments)
         {
             float total = 0f;
-            foreach (var s in segments) total += Mathf.Max(0.01f, s.weight);
+            for (int i = 0; i < segments.Count; i++) total += Mathf.Max(0.01f, segments[i].weight);
 
             double roll = _ctx.Rng.NextDouble() * total;
             for (int i = 0; i < segments.Count; i++)
@@ -78,12 +80,32 @@ namespace SinWheel
         private void Resolve(SegmentConfig segment)
         {
             State = SpinState.Resolving;
+            bool hadEncounter = _ctx.Bosses.EncounterActive;
+
+            // Streak first: a reward that completes the chain should be paid at
+            // the multiplier it just earned.
+            _ctx.Streak.OnLanded(segment);
 
             OutcomeResult result = OutcomeResolver.Apply(_ctx, segment);
             _ctx.Hud.ShowOutcome(result);
+            if (_ctx.Streak.JustBroke) _ctx.Hud.ShowStreakBreak();
 
             _ctx.Buffs.TickSpin();
-            _ctx.Bosses.OnSpinResolved();
+            _ctx.Notice.OnSpin(_ctx.Wallet.RunCoins);
+
+            if (hadEncounter)
+            {
+                if (_ctx.Bosses.EncounterActive) _ctx.Bosses.OnSpinResolved(segment);
+            }
+            else
+            {
+                // A full meter spends itself on the next risk wedge.
+                _ctx.Bosses.TryForcedSummon(segment);
+            }
+
+            // Recorded after the boss hook so Envy can ask what this run has
+            // never produced.
+            _ctx.Run.WedgesHit.Add(segment.id);
             _ctx.Game.AfterSpinResolved();
 
             if (!_ctx.Game.RunActive)

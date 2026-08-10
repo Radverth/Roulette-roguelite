@@ -1,17 +1,32 @@
 {
   "wheelId": "base_12",
-  "segments": [
-    { "id": "coins_small_a", "type": "Coins", "label": "+10", "weight": 10, "amount": 10, "colorHex": "#D4AF37", "icon": "" },
-    { "id": "damage_a", "type": "Damage", "label": "-12 HP", "weight": 6, "amount": 12, "colorHex": "#A32633", "icon": "" },
-    { "id": "xp_small", "type": "Xp", "label": "+8 XP", "weight": 8, "amount": 8, "colorHex": "#4FA6A0", "icon": "" },
-    { "id": "coins_small_b", "type": "Coins", "label": "+15", "weight": 8, "amount": 15, "colorHex": "#D4AF37", "icon": "" },
-    { "id": "sin_summon", "type": "SinSummon", "label": "SIN", "weight": 5, "amount": 0, "colorHex": "#7B4FA6", "icon": "" },
-    { "id": "buff", "type": "Buff", "label": "BLESS", "weight": 4, "amount": 0, "colorHex": "#E8DCC0", "icon": "" },
-    { "id": "coins_medium", "type": "Coins", "label": "+25", "weight": 6, "amount": 25, "colorHex": "#E0BE4E", "icon": "" },
-    { "id": "coin_loss", "type": "CoinLoss", "label": "-25%", "weight": 4, "amount": 25, "colorHex": "#5E1420", "icon": "" },
-    { "id": "xp_medium", "type": "Xp", "label": "+15 XP", "weight": 4, "amount": 15, "colorHex": "#4FA6A0", "icon": "" },
-    { "id": "gems", "type": "Gems", "label": "GEM", "weight": 2, "amount": 1, "colorHex": "#9B6FD0", "icon": "" },
-    { "id": "debuff", "type": "Debuff", "label": "HEX", "weight": 4, "amount": 0, "colorHex": "#7A8C3F", "icon": "" },
-    { "id": "jackpot", "type": "Coins", "label": "+60", "weight": 3, "amount": 60, "colorHex": "#F0D060", "icon": "seg_jackpot" }
+  "startingRing": [
+    "coin_small",
+    "damage_small",
+    "xp_small",
+    "coin_mid",
+    "sin_summon",
+    "buff",
+    "coin_small",
+    "currency_loss",
+    "xp_mid",
+    "shard",
+    "debuff",
+    "jackpot"
+  ],
+  "catalog": [
+    { "id": "coin_small", "type": "Coins", "label": "COIN", "weight": 10, "amount": 10, "colorHex": "#A88C46", "icon": "", "wedgeClass": "reward", "rarity": "common", "tierScale": 1.6, "draftable": true },
+    { "id": "coin_mid", "type": "Coins", "label": "COIN", "weight": 6, "amount": 25, "colorHex": "#D6BE7E", "icon": "", "wedgeClass": "reward", "rarity": "rare", "tierScale": 1.6, "draftable": true },
+    { "id": "jackpot", "type": "Coins", "label": "JACKPOT", "weight": 3, "amount": 60, "colorHex": "#D6BE7E", "icon": "seg_jackpot", "wedgeClass": "reward", "rarity": "cursed", "tierScale": 1.7, "draftable": true },
+    { "id": "xp_small", "type": "Xp", "label": "XP", "weight": 8, "amount": 8, "colorHex": "#2E8C7A", "icon": "", "wedgeClass": "reward", "rarity": "common", "tierScale": 1.5, "draftable": true },
+    { "id": "xp_mid", "type": "Xp", "label": "XP", "weight": 4, "amount": 15, "colorHex": "#5CCBB0", "icon": "", "wedgeClass": "reward", "rarity": "rare", "tierScale": 1.5, "draftable": true },
+    { "id": "shard", "type": "Gems", "label": "SHARD", "weight": 2, "amount": 1, "colorHex": "#9B6FD4", "icon": "", "wedgeClass": "reward", "rarity": "rare", "tierScale": 2.0, "draftable": true },
+    { "id": "buff", "type": "Buff", "label": "BLESS", "weight": 4, "amount": 0, "colorHex": "#C2CADD", "icon": "", "wedgeClass": "reward", "rarity": "common", "tierScale": 1.0, "draftable": true },
+    { "id": "humility", "type": "Humility", "label": "HUMILITY", "weight": 5, "amount": 5, "colorHex": "#93A0BC", "icon": "Loop/break_pride", "wedgeClass": "reward", "rarity": "common", "tierScale": 1.0, "draftable": false },
+    { "id": "damage_small", "type": "Damage", "label": "WOUND", "weight": 6, "amount": 12, "colorHex": "#B02A44", "icon": "", "wedgeClass": "risk", "rarity": "common", "tierScale": 1.0, "draftable": true },
+    { "id": "damage_large", "type": "Damage", "label": "WOUND", "weight": 5, "amount": 20, "colorHex": "#E05A72", "icon": "", "wedgeClass": "risk", "rarity": "common", "tierScale": 1.0, "draftable": true },
+    { "id": "currency_loss", "type": "CoinLoss", "label": "TAKEN", "weight": 4, "amount": 25, "colorHex": "#58162F", "icon": "", "wedgeClass": "risk", "rarity": "common", "tierScale": 1.0, "draftable": true },
+    { "id": "debuff", "type": "Debuff", "label": "HEX", "weight": 4, "amount": 0, "colorHex": "#8F9B3F", "icon": "", "wedgeClass": "risk", "rarity": "common", "tierScale": 1.0, "draftable": true },
+    { "id": "sin_summon", "type": "SinSummon", "label": "SIN", "weight": 5, "amount": 0, "colorHex": "#6B3FA0", "icon": "", "wedgeClass": "risk", "rarity": "common", "tierScale": 1.0, "draftable": false }
   ]
 }

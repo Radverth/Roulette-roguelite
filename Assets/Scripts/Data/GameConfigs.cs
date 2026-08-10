@@ -14,6 +14,7 @@ namespace SinWheel
         Xp,
         Gems,
         Buff,
+        Humility,
         Damage,
         CoinLoss,
         Debuff,
@@ -29,7 +30,14 @@ namespace SinWheel
         public float weight;
         public float amount;
         public string colorHex;
-        public string icon; // optional sprite under Art/Icons; falls back to type default
+        public string icon;        // optional sprite under Art/Icons
+        public string wedgeClass;  // "reward" | "risk" — drives disc shading and streaks
+        public string rarity;      // "common" | "rare" | "cursed" — Forge offer pool
+        public float tierScale = 1.6f;
+        public bool draftable = true;
+
+        /// <summary>Temper level 1-3. Runtime only: the ring stores it, not the catalog.</summary>
+        [NonSerialized] public int tier = 1;
 
         public SegmentType ParsedType
         {
@@ -40,6 +48,12 @@ namespace SinWheel
                 return SegmentType.Coins;
             }
         }
+
+        public bool IsRisk => wedgeClass == "risk";
+        public bool IsReward => !IsRisk;
+
+        /// <summary>Base value scaled by temper tier.</summary>
+        public float EffectiveAmount => amount * Mathf.Pow(Mathf.Max(1f, tierScale), Mathf.Max(1, tier) - 1);
 
         public Color ParsedColor
         {
@@ -55,7 +69,9 @@ namespace SinWheel
             return new SegmentConfig
             {
                 id = id, type = type, label = label,
-                weight = weight, amount = amount, colorHex = colorHex, icon = icon
+                weight = weight, amount = amount, colorHex = colorHex, icon = icon,
+                wedgeClass = wedgeClass, rarity = rarity, tierScale = tierScale,
+                draftable = draftable, tier = tier
             };
         }
     }
@@ -64,7 +80,10 @@ namespace SinWheel
     public class WheelConfig
     {
         public string wheelId;
-        public List<SegmentConfig> segments = new List<SegmentConfig>();
+        /// <summary>Every wedge the game knows about. The ring is built from these by id.</summary>
+        public List<SegmentConfig> catalog = new List<SegmentConfig>();
+        /// <summary>Catalog ids making up a fresh player's ring, in wheel order.</summary>
+        public List<string> startingRing = new List<string>();
     }
 
     [Serializable]
@@ -86,6 +105,12 @@ namespace SinWheel
         public int shufflePeriodSpins;          // Lust
         public float spinCostPercentOfBank;     // Gluttony
         public float rewardShrinkPercent;       // Pride
+        public int humilityWedges = 2;          // Pride splices these in to be broken
+        public int breakTarget = 3;             // generic "N of something" break threshold
+        public float wrathHealthFloorPercent = 25f;
+
+        /// <summary>Shown on the encounter strip: how to break this sin.</summary>
+        public string breakHint;
 
         // Risk/reward scaling while the sin is active.
         public float rewardMultiplierStart = 1f;
@@ -147,7 +172,37 @@ namespace SinWheel
         public float debuffDamageMultiplier = 1.5f;
         public int debuffDurationSpins = 5;
 
-        public int wheelTextureSize = 640;
+        // --- Notice: the escalation made visible (8 segments) ---
+        public float noticeSegments = 8f;
+        public float noticePerSpin = 0.35f;
+        public float noticePerTithe = 1f;
+        public float noticeHighPurseThreshold = 200f;
+        public float noticeHighPurseBonus = 0.25f;
+        public float noticeOnSinBroken = -3f;
+        public float noticeOnHumility = -1f;
+        public float noticeOnEncounterEnd = -2f;
+
+        // --- Streak: tension on every spin ---
+        public int streakStartsAt = 3;
+        public float streakStepMultiplier = 0.25f;
+        public float streakMaxMultiplier = 3f;
+
+        // --- Quota, debt and the tithe ---
+        public int debtStart = 5000;
+        public int quotaBase = 250;
+        public float quotaGrowth = 1.15f;
+        public float quotaRelief = 0.92f;
+        public float tithePercentOfPurse = 50f;
+        public int maxPenaltyRiskWedges = 4;
+
+        // --- The Forge ---
+        public int forgeMinRingSize = 12;
+        public int forgeCursedFromRingSize = 15;
+        public int forgeMaxTier = 3;
+        public int forgeRerollCost = 50;
+
+        // --- Near-miss: bias the resting angle toward the richest neighbour ---
+        public float nearMissChance = 0.6f;
     }
 
     /// <summary>Aggregated root handed to every system via GameContext.</summary>

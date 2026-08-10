@@ -11,15 +11,64 @@ seam waiting for their implementations.
 
 ## Core loop
 
-1. Tap **SPIN** (1.5s cooldown, upgrade-reducible). Landing segment is rolled by
-   weight, then the wheel animates onto it — visuals always match resolution.
-2. 8 reward segments (coins, XP, blessing buffs, gems) vs 4 risk segments
-   (damage, coin loss, hex debuffs, **sin summon**).
-3. Sin summon chance scales with every summon segment hit until a boss awakens.
-4. A run ends when resilience (shared HP meter) hits zero — unbanked coins are
-   forfeit — or when the player banks out, which is never punished.
-5. Surviving a sin boss escalates the reward multiplier every spin: risk and
-   reward climb together.
+The wheel is a debt being serviced, and the loop puts a decision on four
+different clocks (design: `Assets/Resources/Art/Loop/LOOP_DESIGN.md`):
+
+| Horizon | System | Decision |
+|---|---|---|
+| Per spin | **Streak** | protect the chain or chase the bigger wedge |
+| Per encounter | **Break conditions** | fight the sin or wait it out |
+| Per run | **Quota + Notice** | when to leave, and how much to leave with |
+| Between runs | **The Forge** | what kind of wheel you are building |
+
+1. Tap **SPIN** (1.5s cooldown, upgrade-reducible). The landing wedge is rolled
+   by weight, then the wheel eases onto it — visuals always match resolution,
+   and the resting angle is biased toward the seam it shares with its richest
+   neighbour, so the ticker often settles *just* past a jackpot.
+2. Reward wedges (coins, XP, blessings, shards, jackpot) vs risk wedges
+   (wounds, coin loss, hexes, **sin summon**).
+3. **Streak**: three reward wedges in a row starts a chain, each further reward
+   adds +0.25x, any risk wedge wipes it. Capped at 3.0x.
+4. **Notice** is the escalation made visible: eight segments that fill with
+   spins, tithes and a fat purse, with an eye that opens in four stages. At
+   full, the next risk wedge guarantees a summon and the meter resets.
+5. **Tithe** converts half the purse without ending the run — safety now,
+   bought with a segment of Notice. **Bank** takes it all and walks.
+6. Every run carries a **quota** drawn from the debt. Meet it and the debt
+   falls and the quota eases; miss it and the debt grows, the quota compounds,
+   and the house splices another risk wedge into your ring. Leaving early is
+   not the safe option, it is a different risk.
+7. A run ends when resilience hits zero — unbanked coins forfeit — or when the
+   player banks out.
+
+### The Forge
+
+Between runs, three cards: **Add** a wedge, **Strike** one permanently, or
+**Temper** one up a tier (three max). Take one, the rest burn; one reroll per
+visit costs relics. Offers are weighted, not uniform — Strike never appears at
+twelve wedges or fewer, Temper only targets wedges you own, Add and Strike are
+each guaranteed within any three visits, and cursed offers (a strong reward
+that drags a risk wedge in with it) only appear once the ring reaches fifteen.
+
+Because the ring is a deck, the wheel disc is rasterised at runtime for
+whatever wedge count you have built (`WheelDiscRenderer`, a C# port of the
+authored generator's polar rasteriser — same palette, same dither, same seam
+rules).
+
+### Breaking a sin
+
+Every sin states how to break it, and breaking it leaves a benefit for the rest
+of the run — that is what makes fighting worth the risk over waiting out the timer.
+
+| Sin | Break | Reward |
+|---|---|---|
+| Pride | three Humility wedges in a row | its shrink cannot apply again this run |
+| Greed | land the Jackpot | reclaim the whole tithe pool at once |
+| Wrath | three wounds while above 25% resilience | its spliced teeth become coin |
+| Envy | land a wedge untouched all run | nothing left to copy; it leaves |
+| Lust | land the same wedge twice running | the ring locks in place |
+| Gluttony | tithe during the encounter | it takes a cut and goes |
+| Sloth | fill the resist meter with unbroken spins | cooldown drops below baseline |
 
 ## Art
 
@@ -76,9 +125,16 @@ GameBootstrap (MonoBehaviour, scene entry)
      │       ModifyCoinGain, OnSpinStarted, OnSpinResolved, IsDefeated
      │       (SlothModifier implemented; factory maps the other six)
      ├─ SpinSystem ────── state machine: Idle → Spinning → Resolving → Cooldown
-     ├─ GameManager ───── run lifecycle: start, death, bank-out
-     └─ HudController ─── UGUI built at runtime + WheelController
-                          (procedural wheel texture, eased spin, juice)
+     ├─ WheelRingSystem ─ the ring is the build: persistent wedge slots with
+     │                    temper tiers, warped per run by sin splices, Lust's
+     │                    shuffles and unpaid-debt penalty wedges
+     ├─ NoticeSystem ──── eight segments of visible summon pressure
+     ├─ StreakSystem ──── the per-spin chain and its multiplier
+     ├─ DebtSystem ────── quota, debt, tithe accounting
+     ├─ ForgeSystem ───── weighted draft offers between runs
+     ├─ GameManager ───── run lifecycle: start, tithe, death, bank-out, settle
+     └─ HudController ─── UGUI built at runtime + WheelController + ForgeScreen
+                          (runtime-rasterised disc, eased spin, juice)
 ```
 
 ### Spin state machine
@@ -92,10 +148,9 @@ Cooldown length passes through upgrades first, then the active sin's
 ### Sin bosses
 
 Each sin is a `SinBossConfig` entry in `sins.json` plus a `BossModifierBase`
-subclass. An encounter overlays the normal wheel for N spins; ending conditions
-are surviving the duration or the sin-specific early-out. **Sloth** (unlocked at
-level 1): cooldown ×2 (softened by its 3-tier resistance upgrade), broken early
-by filling a resist meter with consecutive spins. Bosses unlock by level and are
+subclass, hooking the ring, cooldown, reward multiplier, coin gain, damage,
+tithes and the landed wedge. All seven are implemented, each with the break
+condition and run-long boon in the table above. They unlock by level and are
 then drawn weighted-random, so returning players face variety.
 
 ### Data-driven balance
@@ -104,9 +159,9 @@ All tuning lives in `Assets/Resources/Config/`:
 
 | File | Contents |
 |---|---|
-| `tuning.json` | cooldowns, HP, summon-chance scaling, XP curve, buff/debuff values |
-| `wheel.json` | the 12 segments: type, weight, amount, label, color |
-| `sins.json` | all seven sins: unlock level, duration, modifier params, payouts |
+| `tuning.json` | cooldowns, HP, XP curve, buffs, Notice, Streak, quota/debt, Forge, near-miss |
+| `wheel.json` | the wedge catalog (type, weight, amount, class, rarity, temper scale) and the starting ring |
+| `sins.json` | all seven sins: unlock level, duration, modifier params, break targets, payouts |
 | `upgrades.json` | meta tree (cooldown/HP/banking) + per-sin resistance trees |
 
 Rebalancing requires no code changes; segment types are the only enum contract.

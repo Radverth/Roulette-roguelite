@@ -34,9 +34,20 @@ namespace SinWheel
             _ctx.Wallet = new CurrencySystem(_ctx);
             _ctx.Xp = new XpSystem(_ctx);
             _ctx.Buffs = new BuffSystem();
+
+            _ctx.Run = new RunState();
+            _ctx.Ring = new WheelRingSystem(_ctx);
+            _ctx.Notice = new NoticeSystem(_ctx);
+            _ctx.Streak = new StreakSystem(_ctx);
+            _ctx.Debt = new DebtSystem(_ctx);
+            _ctx.Forge = new ForgeSystem(_ctx);
+
             _ctx.Bosses = new SinBossSystem(_ctx);
             _ctx.Spin = new SpinSystem(_ctx);
             _ctx.Game = new GameManager(_ctx);
+
+            _ctx.Debt.EnsureSeeded();
+            _ctx.Ring.Rebuild();
 
             _ctx.Hud = new HudController(_ctx);
             _ctx.Hud.Build();
