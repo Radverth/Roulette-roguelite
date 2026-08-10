@@ -3,9 +3,9 @@ using UnityEngine;
 namespace SinWheel
 {
     /// <summary>
-    /// Run lifecycle: a run lasts until resilience hits zero (unbanked coins
-    /// forfeit) or the player banks out voluntarily (never punished — the whole
-    /// tension is choosing when to stop spinning).
+    /// Run lifecycle. A run lasts until resilience hits zero or the player
+    /// walks away — but walking away is no longer free: every run carries a
+    /// quota drawn from the debt, and the ledger settles against it.
     /// </summary>
     public sealed class GameManager
     {
@@ -13,6 +13,8 @@ namespace SinWheel
 
         public bool RunActive { get; private set; }
         public int SpinsThisRun;
+        public DebtOutcome LastDebtOutcome { get; private set; } = DebtOutcome.Owed;
+
         private bool _greedNoticedThisRun;
 
         public GameManager(GameContext ctx)
@@ -28,11 +30,18 @@ namespace SinWheel
             _ctx.Buffs.Clear();
             _ctx.Bosses.ResetForRun();
             _ctx.Spin.ResetForRun();
+            _ctx.Run.Reset();
+            _ctx.Notice.ResetForRun();
+            _ctx.Streak.ResetForRun();
+            _ctx.Debt.ResetForRun();
+            _ctx.Ring.ClearShuffle(); // also rebuilds the ring for the new run
+
             SpinsThisRun = 0;
             _greedNoticedThisRun = false;
             RunActive = true;
 
-            _ctx.Analytics.Track("run_start", "level", _ctx.Xp.Level);
+            _ctx.Analytics.Track("run_start",
+                "level", _ctx.Xp.Level, "quota", _ctx.Debt.Quota, "ring", _ctx.Ring.Count);
             _ctx.Hud?.OnRunStarted();
 
             // The Croupier speaks at run start and run end, nowhere else.
@@ -49,7 +58,7 @@ namespace SinWheel
             }
 
             // Reactive: a long unbanked streak earns approval from the wrong quarter.
-            if (RunActive && !_greedNoticedThisRun && SpinsThisRun == 15 && _ctx.Wallet.RunCoins > 0)
+            if (RunActive && !_greedNoticedThisRun && SpinsThisRun == 15 && _ctx.Debt.PaidThisRun == 0)
             {
                 _greedNoticedThisRun = true;
                 var line = _ctx.Narrative.Reactive?.never_banked_this_run;
@@ -58,11 +67,39 @@ namespace SinWheel
             }
         }
 
+        public bool CanTithe => RunActive
+            && _ctx.Spin.State != SpinState.Spinning
+            && _ctx.Wallet.RunCoins > 0;
+
+        /// <summary>
+        /// Pay part of the purse without ending the run. Costs a segment of
+        /// Notice — and it is the one thing Gluttony cannot survive.
+        /// </summary>
+        public void Tithe()
+        {
+            if (!CanTithe) return;
+
+            int banked = _ctx.Wallet.TitheRunCoins(
+                _ctx.Config.Tuning.tithePercentOfPurse, _ctx.Upgrades.BankingBonusMultiplier());
+            if (banked <= 0) return;
+
+            _ctx.Debt.RecordPayment(banked);
+            _ctx.Notice.OnTithe();
+            _ctx.Hud?.Toast($"TITHED {banked}", Palette.Gold);
+            Sfx.Reward();
+
+            _ctx.Analytics.Track("tithe", "amount", banked, "spins", SpinsThisRun);
+            _ctx.Bosses.OnTithe();
+            _ctx.Save.Persist();
+        }
+
         public void BankAndEndRun()
         {
             if (!RunActive || _ctx.Spin.State == SpinState.Spinning) return;
 
             int banked = _ctx.Wallet.BankRunCoins(_ctx.Upgrades.BankingBonusMultiplier());
+            _ctx.Debt.RecordPayment(banked);
+
             if (banked > _ctx.Save.Data.bestSingleBank)
                 _ctx.Save.Data.bestSingleBank = banked;
 
@@ -92,27 +129,29 @@ namespace SinWheel
             int purseAtEnd = banked ? bankedAmount : _ctx.Wallet.RunCoins;
 
             // Boss drop-off is the metric the sin difficulty curve is tuned on.
-            // A fled sin may claim the ledger quote (priority 2) before the
-            // Croupier's bookend (priority 1) is offered.
             _ctx.Bosses.AbandonEncounter(banked ? "banked_out" : "died");
             _ctx.Narrative.ChooseRunEndQuote(banked, purseAtEnd);
 
             if (!banked)
                 _ctx.Wallet.ResetRun(); // unbanked winnings are forfeit
 
+            LastDebtOutcome = _ctx.Debt.Settle();
+
             _ctx.Save.Data.runsCompleted++;
             _ctx.Save.Persist();
 
             _ctx.Analytics.Track("run_end",
-                "banked", banked, "amount", bankedAmount, "spins", SpinsThisRun, "level", _ctx.Xp.Level);
+                "banked", banked, "amount", bankedAmount, "spins", SpinsThisRun,
+                "level", _ctx.Xp.Level, "paid", _ctx.Save.Data.lastRunPaid,
+                "quota_met", _ctx.Save.Data.lastRunMetQuota, "debt", _ctx.Debt.Debt);
 
-            _ctx.Hud?.ShowRunEnd(banked, bankedAmount, SpinsThisRun);
+            _ctx.Hud?.ShowRunEnd(banked, bankedAmount, SpinsThisRun, LastDebtOutcome);
         }
 
         private void HandleLevelUp(int newLevel)
         {
             Sfx.LevelUp();
-            _ctx.Hud?.Toast($"LEVEL {newLevel}!", Palette.Gold);
+            _ctx.Hud?.Toast($"LEVEL {newLevel}", Palette.Gold);
 
             foreach (var sin in _ctx.Config.Sins.sins)
             {

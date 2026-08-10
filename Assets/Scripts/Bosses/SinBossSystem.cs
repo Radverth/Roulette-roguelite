@@ -5,19 +5,18 @@ using UnityEngine;
 namespace SinWheel
 {
     /// <summary>
-    /// Owns sin summoning and the active encounter. Summon chance scales with
-    /// every SinSummon segment hit and resets when a boss actually appears.
-    /// Bosses unlock by player level, then get picked weighted-random so
-    /// returning players face variety instead of a fixed order.
+    /// Owns sin summoning and the active encounter. Pressure is the Notice
+    /// meter now: it rises with spins, tithes and a fat purse, and when it
+    /// fills, the next risk wedge is a certainty rather than a coin flip.
+    /// Bosses unlock by level, then get picked weighted-random so returning
+    /// players face variety instead of a fixed order.
     /// </summary>
     public sealed class SinBossSystem
     {
         private readonly GameContext _ctx;
-        private float _summonChance;
 
         public BossEncounter Encounter { get; private set; }
         public bool EncounterActive => Encounter != null;
-        public float SummonChance => _summonChance;
 
         public float CurrentRewardMultiplier => Encounter?.RewardMultiplier ?? 1f;
 
@@ -28,7 +27,6 @@ namespace SinWheel
 
         public void ResetForRun()
         {
-            _summonChance = _ctx.Config.Tuning.sinSummonBaseChance;
             Encounter = null;
         }
 
@@ -39,33 +37,45 @@ namespace SinWheel
                 .ToList();
         }
 
-        /// <summary>Called when the wheel lands on a SinSummon segment. Returns banner text.</summary>
+        /// <summary>The wheel landed on the summon wedge. Returns the banner line.</summary>
         public string OnSummonSegmentHit()
         {
             if (EncounterActive)
             {
-                // The wheel already answers to a sin; the omen just stings.
                 float dmg = _ctx.Health.ApplyDamage(5f * _ctx.Buffs.DamageMultiplier);
                 return $"THE SIN STIRS -{Mathf.RoundToInt(dmg)} HP";
             }
 
             var candidates = UnlockedSins();
             if (candidates.Count == 0)
-            {
-                _summonChance = Mathf.Min(_ctx.Config.Tuning.sinSummonChanceMax,
-                    _summonChance + _ctx.Config.Tuning.sinSummonChanceIncrement);
-                return "SOMETHING WATCHES...";
-            }
+                return "SOMETHING WATCHES";
 
-            if (_ctx.Rng.NextDouble() < _summonChance)
+            // Summon chance is the base plus however far the Notice has filled.
+            var t = _ctx.Config.Tuning;
+            float chance = Mathf.Min(t.sinSummonChanceMax, t.sinSummonBaseChance + _ctx.Notice.Fill);
+            if (_ctx.Rng.NextDouble() < chance)
             {
                 StartEncounter(PickWeighted(candidates));
-                return $"{Encounter.Config.displayName.ToUpperInvariant()} AWAKENS!";
+                return $"{Encounter.Config.displayName.ToUpperInvariant()} AWAKENS";
             }
 
-            _summonChance = Mathf.Min(_ctx.Config.Tuning.sinSummonChanceMax,
-                _summonChance + _ctx.Config.Tuning.sinSummonChanceIncrement);
-            return $"SIN CHANCE {Mathf.RoundToInt(_summonChance * 100)}%";
+            return $"SIN CHANCE {Mathf.RoundToInt(chance * 100)}%";
+        }
+
+        /// <summary>
+        /// A full Notice meter spends itself on the next risk wedge: the sin
+        /// arrives, guaranteed, and the eye closes again.
+        /// </summary>
+        public bool TryForcedSummon(SegmentConfig landed)
+        {
+            if (EncounterActive || !landed.IsRisk || !_ctx.Notice.IsFull) return false;
+
+            var candidates = UnlockedSins();
+            if (candidates.Count == 0) return false;
+
+            _ctx.Notice.ConsumeFull();
+            StartEncounter(PickWeighted(candidates));
+            return true;
         }
 
         private SinBossConfig PickWeighted(List<SinBossConfig> candidates)
@@ -87,13 +97,12 @@ namespace SinWheel
                 Config = cfg,
                 Modifier = BossModifierFactory.Create(_ctx, cfg),
                 SpinsRemaining = cfg.durationSpins,
-                SpinsElapsed = 0,
-                Resist = 0
+                SpinsElapsed = 0
             };
-            _summonChance = _ctx.Config.Tuning.sinSummonBaseChance;
 
             int visits = SaveData.IncrementCount(_ctx.Save.Data.sinEncounters, cfg.id);
             _ctx.Narrative.BeginEncounter(cfg.id, visits >= 3);
+            _ctx.Ring.Rebuild(); // the sin's splices join the wheel
 
             _ctx.Analytics.Track("boss_encounter_start", "sin", cfg.id, "player_level", _ctx.Xp.Level);
             _ctx.Hud?.OnBossStarted(Encounter);
@@ -101,36 +110,44 @@ namespace SinWheel
             Haptics.Heavy();
         }
 
-        // --- Hooks called by SpinSystem ---
-
-        public List<SegmentConfig> GetEffectiveSegments(List<SegmentConfig> baseSegments)
-        {
-            if (!EncounterActive) return baseSegments;
-            return Encounter.Modifier.ModifySegments(baseSegments);
-        }
+        // --- Hooks called by SpinSystem / GameManager ---
 
         public float ModifyCooldown(float cooldown)
         {
-            return EncounterActive ? Encounter.Modifier.ModifyCooldown(cooldown) : cooldown;
+            float withBoss = EncounterActive ? Encounter.Modifier.ModifyCooldown(cooldown) : cooldown;
+            return Mathf.Max(0.1f, withBoss - _ctx.Run.SlothCooldownBonus);
         }
 
-        public int ModifyCoinGain(int coins)
-        {
-            return EncounterActive ? Encounter.Modifier.ModifyCoinGain(coins) : coins;
-        }
+        public float ModifyRewardMultiplier(float multiplier) =>
+            EncounterActive ? Encounter.Modifier.ModifyRewardMultiplier(multiplier) : multiplier;
+
+        public int ModifyCoinGain(int coins) =>
+            EncounterActive ? Encounter.Modifier.ModifyCoinGain(coins) : coins;
+
+        public float ModifyDamage(float damage) =>
+            EncounterActive ? Encounter.Modifier.ModifyDamage(damage) : damage;
 
         public void OnSpinStarted()
         {
             if (EncounterActive) Encounter.Modifier.OnSpinStarted(Encounter);
         }
 
-        public void OnSpinResolved()
+        /// <summary>Gluttony's exit: paying mid-encounter buys your way out.</summary>
+        public void OnTithe()
+        {
+            if (!EncounterActive) return;
+            Encounter.Modifier.OnTithe(Encounter);
+            if (Encounter.Modifier.IsDefeated(Encounter))
+                EndEncounter(defeated: true);
+        }
+
+        public void OnSpinResolved(SegmentConfig landed)
         {
             if (!EncounterActive) return;
 
             Encounter.SpinsElapsed++;
             Encounter.SpinsRemaining--;
-            Encounter.Modifier.OnSpinResolved(Encounter);
+            Encounter.Modifier.OnSpinResolved(Encounter, landed);
 
             if (Encounter.Modifier.IsDefeated(Encounter))
             {
@@ -161,7 +178,6 @@ namespace SinWheel
         {
             if (!EncounterActive) return;
 
-            // A fled sin gets the last word on the ledger screen.
             if (reason == "banked_out")
                 _ctx.Narrative.SetRunEndQuote(
                     _ctx.Narrative.EncounterEndLine(Encounter.Config.id, "player_fled"), 2);
@@ -170,21 +186,23 @@ namespace SinWheel
                 "sin", Encounter.Config.id, "outcome", reason, "spins", Encounter.SpinsElapsed);
             Encounter = null;
             _ctx.Hud?.OnBossEnded();
+            _ctx.Ring.Rebuild();
         }
 
         private void EndEncounter(bool defeated)
         {
-            var cfg = Encounter.Config;
-            int spins = Encounter.SpinsElapsed;
+            var encounter = Encounter;
+            var cfg = encounter.Config;
+            int spins = encounter.SpinsElapsed;
 
             if (defeated)
             {
+                encounter.Modifier.OnBroken(encounter);
                 _ctx.Wallet.AddRunCoins(cfg.defeatCoins);
                 _ctx.Wallet.AddGems(cfg.defeatGems);
-                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} REPENTS +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
+                _ctx.Notice.OnSinBroken();
+                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} BROKEN +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
 
-                // Fragments: defeat a sin three times, learn a little of why
-                // you are at the wheel. Delivered on the ledger, never mid-run.
                 int defeats = SaveData.IncrementCount(_ctx.Save.Data.sinDefeats, cfg.id);
                 string fragKey = cfg.id + "_3";
                 if (defeats >= 3 && !_ctx.Save.Data.unlockedFragments.Contains(fragKey))
@@ -200,6 +218,7 @@ namespace SinWheel
                 _ctx.Hud?.Toast($"OUTLASTED {cfg.displayName.ToUpperInvariant()} +{cfg.surviveCoins}C", Palette.Bone);
             }
 
+            _ctx.Notice.OnEncounterEnded();
             _ctx.Hud?.ShowSpeech(cfg.id,
                 _ctx.Narrative.EncounterEndLine(cfg.id, defeated ? "defeated" : "expired"));
 
@@ -208,6 +227,7 @@ namespace SinWheel
 
             Encounter = null;
             _ctx.Hud?.OnBossEnded();
+            _ctx.Ring.Rebuild(); // the splices leave with it
             Sfx.LevelUp();
         }
     }

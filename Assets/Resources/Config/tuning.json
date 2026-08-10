@@ -3,15 +3,45 @@
   "minSpinCooldown": 0.5,
   "spinAnimDuration": 2.2,
   "baseMaxHp": 100,
+
   "sinSummonBaseChance": 0.25,
   "sinSummonChanceIncrement": 0.15,
   "sinSummonChanceMax": 0.95,
+
   "xpBase": 20,
   "xpGrowth": 1.35,
+
   "bankingBonusBase": 1.0,
+
   "buffRewardMultiplier": 1.25,
   "buffDurationSpins": 5,
   "debuffDamageMultiplier": 1.5,
   "debuffDurationSpins": 5,
-  "wheelTextureSize": 640
+
+  "noticeSegments": 8,
+  "noticePerSpin": 0.35,
+  "noticePerTithe": 1.0,
+  "noticeHighPurseThreshold": 200,
+  "noticeHighPurseBonus": 0.25,
+  "noticeOnSinBroken": -3.0,
+  "noticeOnHumility": -1.0,
+  "noticeOnEncounterEnd": -2.0,
+
+  "streakStartsAt": 3,
+  "streakStepMultiplier": 0.25,
+  "streakMaxMultiplier": 3.0,
+
+  "debtStart": 5000,
+  "quotaBase": 250,
+  "quotaGrowth": 1.15,
+  "quotaRelief": 0.92,
+  "tithePercentOfPurse": 50,
+  "maxPenaltyRiskWedges": 4,
+
+  "forgeMinRingSize": 12,
+  "forgeCursedFromRingSize": 15,
+  "forgeMaxTier": 3,
+  "forgeRerollCost": 50,
+
+  "nearMissChance": 0.6
 }

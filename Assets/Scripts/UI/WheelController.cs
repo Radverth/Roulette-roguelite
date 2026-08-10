@@ -7,26 +7,30 @@ using UnityEngine.UI;
 namespace SinWheel
 {
     /// <summary>
-    /// The authored pixel wheel, layered per the art spec:
-    ///   glow → disc (rotates, carries wedge icons) → rim (static) →
-    ///   segment flash (static, drawn at 12 o'clock) → hub → pointer.
-    /// Wedge order is authored (risk at indices 1/4/7/10 so no two are
-    /// adjacent) — wheel.json must list segments in the same order; see
-    /// Art/Wheel/segment_layout.txt.
-    /// The landing segment is pre-rolled by SpinSystem; the animation eases
-    /// the disc onto it, so visuals always match resolution.
+    /// The wheel, layered per the art spec: glow → disc (rotates, carries wedge
+    /// icons) → rim (static) → landing flash → hub → pointer.
+    ///
+    /// The Forge makes the ring a deck, so wedge count changes between and
+    /// during runs; the disc and flash are rasterised at runtime to match
+    /// (see WheelDiscRenderer) whenever the ring version moves.
+    ///
+    /// The landing wedge is pre-rolled by SpinSystem — the animation only
+    /// decides where inside that wedge the ticker comes to rest, which is where
+    /// the near-miss bias lives.
     /// </summary>
     public sealed class WheelController
     {
-        private const float Arc = 30f;         // 12 wedges
-        private const float IconRadius = 42f;  // wedge icon centers, in art px
+        private const float IconRadius = 42f;
 
         private readonly GameContext _ctx;
         private readonly RectTransform _container;
         private readonly RectTransform _disc;
+        private readonly Image _discImage;
         private readonly Image _flash;
         private readonly List<Image> _icons = new List<Image>();
 
+        private int _ringVersion = -1;
+        private int _wedgeCount = 12;
         private float _currentRotation;
         private Coroutine _flashRoutine;
 
@@ -41,14 +45,14 @@ namespace SinWheel
             glow.color = new Color(1f, 1f, 1f, 0.55f);
             UiFactory.Place((RectTransform)glow.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
 
-            var discImg = UiFactory.CreateSpriteImage(container, "Disc", "Wheel/wheel_disc", new Vector2(128f, 128f));
-            _disc = (RectTransform)discImg.transform;
+            _discImage = UiFactory.CreateSpriteImage(container, "Disc", null, new Vector2(128f, 128f));
+            _disc = (RectTransform)_discImage.transform;
             UiFactory.Place(_disc, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
 
             var rim = UiFactory.CreateSpriteImage(container, "Rim", "Wheel/wheel_rim", new Vector2(128f, 128f));
             UiFactory.Place((RectTransform)rim.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
 
-            _flash = UiFactory.CreateSpriteImage(container, "Flash", "Wheel/wheel_segment_flash", new Vector2(128f, 128f));
+            _flash = UiFactory.CreateSpriteImage(container, "Flash", null, new Vector2(128f, 128f));
             UiFactory.Place((RectTransform)_flash.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(128f, 128f));
             _flash.gameObject.SetActive(false);
 
@@ -58,27 +62,58 @@ namespace SinWheel
             var pointer = UiFactory.CreateSpriteImage(container, "Pointer", "Wheel/wheel_pointer", new Vector2(16f, 24f));
             UiFactory.Place((RectTransform)pointer.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 62f), new Vector2(16f, 24f));
 
-            Rebuild(ctx.Config.Wheel.segments);
+            SyncToRing();
         }
 
-        /// <summary>Re-lay the wedge icons (Lust's shuffles / Wrath's inserts will call this).</summary>
-        public void Rebuild(List<SegmentConfig> segments)
+        public float Arc => 360f / Mathf.Max(1, _wedgeCount);
+
+        /// <summary>Redraw if the ring changed shape since the last look. Cheap when it has not.</summary>
+        public void SyncToRing()
+        {
+            if (_ctx.Ring.Version == _ringVersion) return;
+            _ringVersion = _ctx.Ring.Version;
+
+            var ring = _ctx.Ring.Effective;
+            if (ring.Count == 0) return;
+
+            _wedgeCount = ring.Count;
+
+            // These are generated, not imported: release the previous pair or a
+            // long session leaks a 64KB texture per ring change.
+            DestroyGenerated(_discImage.sprite);
+            DestroyGenerated(_flash.sprite);
+
+            _discImage.sprite = WheelDiscRenderer.BuildDisc(new List<SegmentConfig>(ring));
+            _flash.sprite = WheelDiscRenderer.BuildFlash(_wedgeCount);
+            RebuildIcons(ring);
+        }
+
+        private static void DestroyGenerated(Sprite sprite)
+        {
+            if (sprite == null) return;
+            Texture2D tex = sprite.texture;
+            UnityEngine.Object.Destroy(sprite);
+            if (tex != null) UnityEngine.Object.Destroy(tex);
+        }
+
+        private void RebuildIcons(IReadOnlyList<SegmentConfig> ring)
         {
             foreach (var icon in _icons)
                 if (icon != null) UnityEngine.Object.Destroy(icon.gameObject);
             _icons.Clear();
 
-            float arc = 360f / segments.Count;
-            for (int i = 0; i < segments.Count; i++)
+            float arc = Arc;
+            // A crowded ring needs smaller icons or they collide at the rim.
+            float size = ring.Count > 16 ? 8f : (ring.Count > 13 ? 12f : 16f);
+
+            for (int i = 0; i < ring.Count; i++)
             {
-                // Wedge i is centered i*arc clockwise from 12 o'clock; icons are
-                // children of the disc so they carry its rotation.
                 float angle = (90f - i * arc) * Mathf.Deg2Rad;
                 var pos = new Vector2(Mathf.Cos(angle) * IconRadius, Mathf.Sin(angle) * IconRadius);
 
-                var img = UiFactory.CreateSpriteImage(_disc, $"Icon_{i}", null, new Vector2(16f, 16f));
-                img.sprite = ArtSprites.IconForSegment(segments[i]);
-                UiFactory.Place((RectTransform)img.transform, new Vector2(0.5f, 0.5f), pos, new Vector2(16f, 16f));
+                var img = UiFactory.CreateSpriteImage(_disc, $"Icon_{i}", null, new Vector2(size, size));
+                img.sprite = ArtSprites.IconForSegment(ring[i]);
+                UiFactory.Place((RectTransform)img.transform, new Vector2(0.5f, 0.5f), pos, new Vector2(size, size));
                 _icons.Add(img);
             }
         }
@@ -95,16 +130,14 @@ namespace SinWheel
 
         private IEnumerator SpinRoutine(int index, float duration, Action onComplete)
         {
-            // Disc rotation z (CCW+) brings wedge k (authored k*30° clockwise
-            // from top) under the pointer when z ≡ k*30.
-            float jitter = ((float)_ctx.Rng.NextDouble() - 0.5f) * Arc * 0.5f;
-            float desiredMod = index * Arc + jitter;
+            float arc = Arc;
+            float desiredMod = index * arc + NearMissJitter(index, arc);
 
             float start = _currentRotation;
-            float baseTarget = start + 720f;
+            float baseTarget = start + 720f; // at least two full turns for weight
             float target = baseTarget + Mathf.Repeat(desiredMod - baseTarget, 360f);
 
-            int lastTick = Mathf.FloorToInt((Mathf.Repeat(start, 360f) + Arc * 0.5f) / Arc);
+            int lastTick = Mathf.FloorToInt((Mathf.Repeat(start, 360f) + arc * 0.5f) / arc);
             float elapsed = 0f;
 
             while (elapsed < duration)
@@ -115,7 +148,7 @@ namespace SinWheel
                 float z = Mathf.Lerp(start, target, eased);
                 _disc.localRotation = Quaternion.Euler(0f, 0f, z);
 
-                int tick = Mathf.FloorToInt((Mathf.Repeat(z, 360f) + Arc * 0.5f) / Arc);
+                int tick = Mathf.FloorToInt((Mathf.Repeat(z, 360f) + arc * 0.5f) / arc);
                 if (tick != lastTick)
                 {
                     lastTick = tick;
@@ -136,9 +169,46 @@ namespace SinWheel
             onComplete?.Invoke();
         }
 
+        /// <summary>
+        /// Where inside the winning wedge the ticker settles. Biased toward the
+        /// seam it shares with its richest neighbour, so the wheel frequently
+        /// comes to rest *just* past a jackpot. This changes nothing about the
+        /// odds — the outcome was chosen before the spin — only how it feels.
+        /// </summary>
+        private float NearMissJitter(int index, float arc)
+        {
+            var ring = _ctx.Ring.Effective;
+            if (ring.Count < 2) return 0f;
+
+            float half = arc * 0.45f; // stay inside the wedge
+            int prev = (index - 1 + ring.Count) % ring.Count;
+            int next = (index + 1) % ring.Count;
+
+            // Rotation grows toward higher indices, so a positive offset parks
+            // the ticker on the seam shared with the next wedge.
+            int side = WedgeValue(ring[next]) >= WedgeValue(ring[prev]) ? 1 : -1;
+
+            if (_ctx.Rng.NextDouble() < _ctx.Config.Tuning.nearMissChance)
+                return side * Mathf.Lerp(0.55f, 0.92f, (float)_ctx.Rng.NextDouble()) * half;
+
+            return ((float)_ctx.Rng.NextDouble() - 0.5f) * half;
+        }
+
+        private static float WedgeValue(SegmentConfig seg)
+        {
+            if (seg.IsRisk) return -1f;
+            switch (seg.ParsedType)
+            {
+                case SegmentType.Gems: return 100f;      // rarest thing on the wheel
+                case SegmentType.Coins: return seg.EffectiveAmount;
+                case SegmentType.Xp: return seg.EffectiveAmount * 0.5f;
+                default: return 5f;
+            }
+        }
+
         private IEnumerator FlashRoutine()
         {
-            // The flash sprite is authored at 12 o'clock — exactly the landing wedge.
+            // The flash sprite is drawn at 12 o'clock — exactly the landing wedge.
             for (int i = 0; i < 3; i++)
             {
                 _flash.gameObject.SetActive(true);

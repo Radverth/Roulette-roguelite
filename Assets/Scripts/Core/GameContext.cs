@@ -23,6 +23,15 @@ namespace SinWheel
         public XpSystem Xp;
         public BuffSystem Buffs;
 
+        // The revised loop: the ring is the build, Notice is the pressure,
+        // Streak is the per-spin tension, Debt is why any of it matters.
+        public RunState Run;
+        public WheelRingSystem Ring;
+        public NoticeSystem Notice;
+        public StreakSystem Streak;
+        public DebtSystem Debt;
+        public ForgeSystem Forge;
+
         public SinBossSystem Bosses;
         public SpinSystem Spin;
         public GameManager Game;

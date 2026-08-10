@@ -11,44 +11,49 @@ namespace SinWheel
     }
 
     /// <summary>
-    /// Applies a landed segment to the run. Reward multiplier stacks buffs and
-    /// the active sin's risk/reward escalation; damage stacks debuffs.
+    /// Applies a landed wedge to the run. Reward payouts stack the wedge's
+    /// temper tier, active blessings, the streak chain and the sin's own
+    /// escalation — and are then shrunk by any sin that taxes them.
     /// </summary>
     public static class OutcomeResolver
     {
         public static OutcomeResult Apply(GameContext ctx, SegmentConfig seg)
         {
             var t = ctx.Config.Tuning;
-            float rewardMult = ctx.Buffs.RewardMultiplier * ctx.Bosses.CurrentRewardMultiplier;
+
+            float rewardMult = ctx.Buffs.RewardMultiplier
+                * ctx.Bosses.CurrentRewardMultiplier
+                * ctx.Streak.Multiplier;
+            rewardMult = ctx.Bosses.ModifyRewardMultiplier(rewardMult);
 
             switch (seg.ParsedType)
             {
                 case SegmentType.Coins:
                 {
-                    int gain = Mathf.RoundToInt(seg.amount * rewardMult);
-                    gain = ctx.Bosses.ModifyCoinGain(gain); // Greed's tax hook
+                    int gain = Mathf.RoundToInt(seg.EffectiveAmount * rewardMult);
+                    gain = ctx.Bosses.ModifyCoinGain(gain); // Greed's tithe hook
                     ctx.Wallet.AddRunCoins(gain);
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,
                         Text = $"+{gain} COINS",
                         Color = Palette.Gold,
-                        BigHit = seg.amount >= 50
+                        BigHit = seg.EffectiveAmount >= 50
                     };
                 }
 
                 case SegmentType.Xp:
                 {
-                    int gain = Mathf.RoundToInt(seg.amount * rewardMult);
+                    int gain = Mathf.RoundToInt(seg.EffectiveAmount * rewardMult);
                     ctx.Xp.AddXp(gain);
                     return new OutcomeResult { Type = seg.ParsedType, Text = $"+{gain} XP", Color = Palette.Teal };
                 }
 
                 case SegmentType.Gems:
                 {
-                    int gain = Mathf.Max(1, Mathf.RoundToInt(seg.amount));
+                    int gain = Mathf.Max(1, Mathf.RoundToInt(seg.EffectiveAmount));
                     ctx.Wallet.AddGems(gain);
-                    return new OutcomeResult { Type = seg.ParsedType, Text = $"+{gain} GEM", Color = Palette.Purple, BigHit = true };
+                    return new OutcomeResult { Type = seg.ParsedType, Text = $"+{gain} SHARD", Color = Palette.Purple, BigHit = true };
                 }
 
                 case SegmentType.Buff:
@@ -63,9 +68,24 @@ namespace SinWheel
                     };
                 }
 
+                case SegmentType.Humility:
+                {
+                    // Lowering your eyes draws the house's attention away.
+                    ctx.Notice.OnHumility();
+                    int gain = Mathf.RoundToInt(seg.EffectiveAmount * rewardMult);
+                    ctx.Wallet.AddRunCoins(gain);
+                    return new OutcomeResult
+                    {
+                        Type = seg.ParsedType,
+                        Text = gain > 0 ? $"HUMILITY +{gain}" : "HUMILITY",
+                        Color = Palette.Dim
+                    };
+                }
+
                 case SegmentType.Damage:
                 {
-                    float dmg = ctx.Health.ApplyDamage(seg.amount * ctx.Buffs.DamageMultiplier);
+                    float raw = seg.EffectiveAmount * ctx.Buffs.DamageMultiplier;
+                    float dmg = ctx.Health.ApplyDamage(ctx.Bosses.ModifyDamage(raw));
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,
@@ -77,7 +97,7 @@ namespace SinWheel
 
                 case SegmentType.CoinLoss:
                 {
-                    int lost = ctx.Wallet.LoseRunCoinsPercent(seg.amount);
+                    int lost = ctx.Wallet.LoseRunCoinsPercent(seg.EffectiveAmount);
                     return new OutcomeResult
                     {
                         Type = seg.ParsedType,

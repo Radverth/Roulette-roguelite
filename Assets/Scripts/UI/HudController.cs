@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,21 +7,22 @@ namespace SinWheel
 {
     /// <summary>
     /// Pixel-art HUD on a 180x320 virtual-pixel grid with integer canvas
-    /// scaling. Narrative delivery follows the design doc: plates and speech
-    /// slide in over the wheel and auto-dismiss — nothing is ever modal during
-    /// a run; quotes and fragments wait for the ledger (run-end) screen.
+    /// scaling. It has to show three time horizons at once now: the chain on
+    /// this spin, the Notice building across the run, and the quota that
+    /// decides whether leaving was worth anything.
     /// </summary>
     public sealed class HudController
     {
         private const int VirtualW = 180;
         private const int VirtualH = 320;
+        private const int StreakPips = 5;
 
         private readonly GameContext _ctx;
 
         public WheelController Wheel { get; private set; }
 
-        private RectTransform _root;   // canvas
-        private RectTransform _frame;  // centered 180x320 design frame
+        private RectTransform _root;
+        private RectTransform _frame;
         private RectTransform _shakeRoot;
 
         private PixelText _hpText;
@@ -32,19 +34,26 @@ namespace SinWheel
         private Image _xpFill;
         private PixelText _statusLine;
 
+        private Image _noticeEye;
+        private Image _noticeFill;
+        private readonly List<Image> _streakPips = new List<Image>();
+        private Image _multiplierBadge;
+        private PixelText _multiplierText;
+
+        private Image _quotaMarker;
+        private PixelText _quotaText;
+
         private Button _spinButton;
         private PixelText _spinLabel;
         private Button _bankButton;
+        private Button _titheButton;
 
         private GameObject _bossStrip;
         private Image _bossSigil;
+        private Image _bossBreakGlyph;
         private PixelText _bossName;
         private PixelText _bossStatus;
-        private Image _resistFill;
-        private GameObject _resistRow;
 
-        // Single non-modal voice slot over the wheel: authored arrival plates
-        // or composed mask+line speech.
         private GameObject _voiceSlot;
         private Image _voicePlate;
         private GameObject _voiceComposed;
@@ -55,9 +64,11 @@ namespace SinWheel
 
         private GameObject _menuPanel;
         private PixelText _menuFragments;
+        private PixelText _menuDebt;
 
         private GameObject _runEndPanel;
         private Image _runEndIntertitle;
+        private Image _debtSeal;
         private PixelText _runEndQuote;
         private PixelText _runEndStats;
         private GameObject _fragmentCard;
@@ -66,12 +77,15 @@ namespace SinWheel
         private GameObject _upgradesPanel;
         private RectTransform _upgradesContent;
 
+        private ForgeScreen _forge;
         private Coroutine _shakeRoutine;
 
         public HudController(GameContext ctx)
         {
             _ctx = ctx;
         }
+
+        private Vector2 Top => new Vector2(0.5f, 1f);
 
         public void Build()
         {
@@ -98,6 +112,8 @@ namespace SinWheel
             UiFactory.Stretch(_shakeRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             BuildTopBar();
+            BuildPressureRow();
+            BuildQuotaRow();
             BuildBossStrip();
             BuildWheelArea();
             BuildBottomBar();
@@ -105,66 +121,111 @@ namespace SinWheel
             BuildRunEndPanel();
             BuildUpgradesPanel();
             BuildMainMenu();
-        }
 
-        private Vector2 Top => new Vector2(0.5f, 1f);
+            _forge = new ForgeScreen(_ctx, _root, () => _ctx.Game.StartRun());
+        }
 
         // --- Construction ---
 
         private void BuildTopBar()
         {
             var title = PixelText.Create(_shakeRoot, "Title", "SIN WHEEL", Palette.Gold);
-            UiFactory.Place((RectTransform)title.transform, Top, new Vector2(0f, -9f), Vector2.zero);
+            UiFactory.Place((RectTransform)title.transform, Top, new Vector2(0f, -8f), Vector2.zero);
 
             var hpIcon = UiFactory.CreateSpriteImage(_shakeRoot, "HpIcon", "Icons/ui_hp", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)hpIcon.transform, Top, new Vector2(-76f, -25f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)hpIcon.transform, Top, new Vector2(-80f, -22f), new Vector2(16f, 16f));
 
-            _hpFill = UiFactory.CreatePixelBar(_shakeRoot, "HpBar", "UI/bar_fill_hp", Top, new Vector2(-30f, -25f));
+            _hpFill = UiFactory.CreatePixelBar(_shakeRoot, "HpBar", "UI/bar_fill_hp", Top, new Vector2(-38f, -22f));
 
             _hpText = PixelText.Create(_shakeRoot, "HpText", "", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_hpText.transform, Top, new Vector2(8f, -25f), Vector2.zero);
+            UiFactory.Place((RectTransform)_hpText.transform, Top, new Vector2(0f, -22f), Vector2.zero);
 
             var coinIcon = UiFactory.CreateSpriteImage(_shakeRoot, "CoinIcon", "Icons/seg_coin", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)coinIcon.transform, Top, new Vector2(-76f, -42f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)coinIcon.transform, Top, new Vector2(-80f, -37f), new Vector2(16f, 16f));
             _runCoinsText = PixelText.Create(_shakeRoot, "RunCoins", "0", Palette.Gold, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_runCoinsText.transform, Top, new Vector2(-66f, -42f), Vector2.zero);
+            UiFactory.Place((RectTransform)_runCoinsText.transform, Top, new Vector2(-70f, -37f), Vector2.zero);
 
             var relicIcon = UiFactory.CreateSpriteImage(_shakeRoot, "RelicIcon", "Icons/ui_relic", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)relicIcon.transform, Top, new Vector2(-20f, -42f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)relicIcon.transform, Top, new Vector2(-24f, -37f), new Vector2(16f, 16f));
             _metaCoinsText = PixelText.Create(_shakeRoot, "MetaCoins", "0", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_metaCoinsText.transform, Top, new Vector2(-10f, -42f), Vector2.zero);
+            UiFactory.Place((RectTransform)_metaCoinsText.transform, Top, new Vector2(-14f, -37f), Vector2.zero);
 
             var shardIcon = UiFactory.CreateSpriteImage(_shakeRoot, "ShardIcon", "Icons/seg_shard", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)shardIcon.transform, Top, new Vector2(40f, -42f), new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)shardIcon.transform, Top, new Vector2(38f, -37f), new Vector2(16f, 16f));
             _gemsText = PixelText.Create(_shakeRoot, "Gems", "0", Palette.Purple, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_gemsText.transform, Top, new Vector2(50f, -42f), Vector2.zero);
+            UiFactory.Place((RectTransform)_gemsText.transform, Top, new Vector2(48f, -37f), Vector2.zero);
 
             _levelText = PixelText.Create(_shakeRoot, "Level", "LV 1", Palette.Teal, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_levelText.transform, Top, new Vector2(-84f, -57f), Vector2.zero);
+            UiFactory.Place((RectTransform)_levelText.transform, Top, new Vector2(-86f, -50f), Vector2.zero);
 
-            _xpFill = UiFactory.CreatePixelBar(_shakeRoot, "XpBar", "UI/bar_fill_xp", Top, new Vector2(4f, -57f));
+            _xpFill = UiFactory.CreatePixelBar(_shakeRoot, "XpBar", "UI/bar_fill_xp", Top, new Vector2(2f, -50f));
+        }
+
+        /// <summary>Notice on the left, the streak chain on the right: dread and greed, side by side.</summary>
+        private void BuildPressureRow()
+        {
+            _noticeEye = UiFactory.CreateSpriteImage(_shakeRoot, "NoticeEye", "Loop/notice_eye_0", new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)_noticeEye.transform, Top, new Vector2(-82f, -65f), new Vector2(16f, 16f));
+
+            var track = UiFactory.CreateSpriteImage(_shakeRoot, "NoticeTrack", "Loop/notice_track", new Vector2(64f, 10f));
+            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-40f, -65f), new Vector2(64f, 10f));
+
+            var fill = UiFactory.CreateRect(track.transform, "Fill");
+            UiFactory.Stretch(fill, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            _noticeFill = fill.gameObject.AddComponent<Image>();
+            _noticeFill.sprite = ArtSprites.Get("Loop/notice_fill_cold");
+            _noticeFill.type = Image.Type.Filled;
+            _noticeFill.fillMethod = Image.FillMethod.Horizontal;
+            _noticeFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            _noticeFill.raycastTarget = false;
+
+            var streakFrame = UiFactory.CreateSpriteImage(_shakeRoot, "StreakFrame", "Loop/streak_frame", new Vector2(56f, 14f));
+            UiFactory.Place((RectTransform)streakFrame.transform, Top, new Vector2(22f, -65f), new Vector2(56f, 14f));
+
+            for (int i = 0; i < StreakPips; i++)
+            {
+                var pip = UiFactory.CreateSpriteImage(streakFrame.transform, $"Pip_{i}", "Loop/streak_pip_empty", new Vector2(8f, 8f));
+                UiFactory.Place((RectTransform)pip.transform, new Vector2(0.5f, 0.5f),
+                    new Vector2(-20f + i * 10f, 0f), new Vector2(8f, 8f));
+                _streakPips.Add(pip);
+            }
+
+            _multiplierBadge = UiFactory.CreateSpriteImage(_shakeRoot, "MultBadge", "Loop/multiplier_badge", new Vector2(28f, 14f));
+            UiFactory.Place((RectTransform)_multiplierBadge.transform, Top, new Vector2(68f, -65f), new Vector2(28f, 14f));
+            _multiplierText = PixelText.Create(_multiplierBadge.transform, "Mult", "X1", Palette.Bone);
+            UiFactory.Place((RectTransform)_multiplierText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), Vector2.zero);
+        }
+
+        /// <summary>What the house expects before you are allowed to feel safe.</summary>
+        private void BuildQuotaRow()
+        {
+            var track = UiFactory.CreateSpriteImage(_shakeRoot, "QuotaTrack", "Loop/quota_track", new Vector2(96f, 12f));
+            UiFactory.Place((RectTransform)track.transform, Top, new Vector2(-38f, -79f), new Vector2(96f, 12f));
+
+            _quotaMarker = UiFactory.CreateSpriteImage(track.transform, "Marker", "Loop/quota_marker", new Vector2(9f, 16f));
+            UiFactory.Place((RectTransform)_quotaMarker.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(9f, 16f));
+
+            _quotaText = PixelText.Create(_shakeRoot, "QuotaText", "", Palette.Dim, 1, PxAlign.Left);
+            UiFactory.Place((RectTransform)_quotaText.transform, Top, new Vector2(14f, -79f), Vector2.zero);
         }
 
         private void BuildBossStrip()
         {
             var strip = UiFactory.CreateNineSlice(_shakeRoot, "BossStrip", "UI/panel_danger");
-            UiFactory.Place((RectTransform)strip.transform, Top, new Vector2(0f, -85f), new Vector2(172f, 38f));
+            UiFactory.Place((RectTransform)strip.transform, Top, new Vector2(0f, -99f), new Vector2(172f, 32f));
             _bossStrip = strip.gameObject;
 
-            _bossSigil = UiFactory.CreateSpriteImage(strip.transform, "Sigil", null, new Vector2(32f, 32f));
-            UiFactory.Place((RectTransform)_bossSigil.transform, new Vector2(0f, 0.5f), new Vector2(21f, 0f), new Vector2(32f, 32f));
+            _bossSigil = UiFactory.CreateSpriteImage(strip.transform, "Sigil", null, new Vector2(24f, 24f));
+            UiFactory.Place((RectTransform)_bossSigil.transform, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(24f, 24f));
 
             _bossName = PixelText.Create(strip.transform, "Name", "", Palette.Gold, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_bossName.transform, new Vector2(0f, 0.5f), new Vector2(42f, 10f), Vector2.zero);
+            UiFactory.Place((RectTransform)_bossName.transform, new Vector2(0f, 0.5f), new Vector2(34f, 7f), Vector2.zero);
 
             _bossStatus = PixelText.Create(strip.transform, "Status", "", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_bossStatus.transform, new Vector2(0f, 0.5f), new Vector2(42f, 0f), Vector2.zero);
+            UiFactory.Place((RectTransform)_bossStatus.transform, new Vector2(0f, 0.5f), new Vector2(34f, -4f), Vector2.zero);
 
-            var resistRow = UiFactory.CreateRect(strip.transform, "ResistRow");
-            UiFactory.Place(resistRow, new Vector2(0f, 0.5f), new Vector2(74f, -11f), new Vector2(64f, 8f));
-            _resistFill = UiFactory.CreatePixelBar(resistRow, "Resist", "UI/bar_fill_resist",
-                new Vector2(0.5f, 0.5f), Vector2.zero);
-            _resistRow = resistRow.gameObject;
+            _bossBreakGlyph = UiFactory.CreateSpriteImage(strip.transform, "BreakGlyph", null, new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)_bossBreakGlyph.transform, new Vector2(1f, 0.5f), new Vector2(-14f, 0f), new Vector2(16f, 16f));
 
             _bossStrip.SetActive(false);
         }
@@ -172,26 +233,30 @@ namespace SinWheel
         private void BuildWheelArea()
         {
             var container = UiFactory.CreateRect(_shakeRoot, "WheelArea");
-            UiFactory.Place(container, Top, new Vector2(0f, -177f), new Vector2(160f, 160f));
+            UiFactory.Place(container, Top, new Vector2(0f, -180f), new Vector2(160f, 160f));
             Wheel = new WheelController(_ctx, container);
 
             _statusLine = PixelText.Create(_shakeRoot, "StatusLine", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_statusLine.transform, Top, new Vector2(0f, -253f), Vector2.zero);
+            UiFactory.Place((RectTransform)_statusLine.transform, Top, new Vector2(0f, -252f), Vector2.zero);
         }
 
         private void BuildBottomBar()
         {
             _spinButton = UiFactory.CreatePixelButton(_shakeRoot, "SpinButton", "SPIN", true, 2,
                 () => _ctx.Spin.RequestSpin(), out _spinLabel);
-            UiFactory.Place((RectTransform)_spinButton.transform, Top, new Vector2(0f, -278f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)_spinButton.transform, Top, new Vector2(0f, -274f), new Vector2(96f, 32f));
+
+            _titheButton = UiFactory.CreatePixelButton(_shakeRoot, "TitheButton", "TITHE", false, 1,
+                () => _ctx.Game.Tithe(), out _, "Loop/button_tithe");
+            UiFactory.Place((RectTransform)_titheButton.transform, Top, new Vector2(-58f, -300f), new Vector2(48f, 16f));
 
             _bankButton = UiFactory.CreatePixelButton(_shakeRoot, "BankButton", "BANK", false, 1,
                 () => _ctx.Game.BankAndEndRun(), out _);
-            UiFactory.Place((RectTransform)_bankButton.transform, Top, new Vector2(-45f, -306f), new Vector2(48f, 16f));
+            UiFactory.Place((RectTransform)_bankButton.transform, Top, new Vector2(0f, -300f), new Vector2(48f, 16f));
 
             var upgrades = UiFactory.CreatePixelButton(_shakeRoot, "UpgradesButton", "UPGRADE", false, 1,
                 ToggleUpgradesPanel, out _);
-            UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(45f, -306f), new Vector2(48f, 16f));
+            UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(58f, -300f), new Vector2(48f, 16f));
         }
 
         private void BuildVoiceSlot()
@@ -199,7 +264,7 @@ namespace SinWheel
             // Slides in over the wheel, never over the spin button; the player
             // can always spin through it. Auto-dismisses.
             _voiceSlot = UiFactory.CreateRect(_frame, "VoiceSlot").gameObject;
-            UiFactory.Place((RectTransform)_voiceSlot.transform, Top, new Vector2(0f, -138f), new Vector2(160f, 64f));
+            UiFactory.Place((RectTransform)_voiceSlot.transform, Top, new Vector2(0f, -145f), new Vector2(160f, 64f));
 
             _voicePlate = UiFactory.CreateSpriteImage(_voiceSlot.transform, "Plate", null, new Vector2(160f, 64f));
             UiFactory.Place((RectTransform)_voicePlate.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(160f, 64f));
@@ -236,7 +301,6 @@ namespace SinWheel
             var title = PixelText.Create(frame, "Title", "SIN WHEEL", Palette.Gold, 2);
             UiFactory.Place((RectTransform)title.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 118f), Vector2.zero);
 
-            // The intertitle carries its own text: THE WHEEL / SEVEN WILL ANSWER / TAP TO BEGIN.
             var card = UiFactory.CreateRect(frame, "StartCard");
             UiFactory.Place(card, new Vector2(0.5f, 0.5f), new Vector2(0f, 52f), new Vector2(128f, 72f));
             var cardImg = card.gameObject.AddComponent<Image>();
@@ -246,12 +310,15 @@ namespace SinWheel
             cardButton.onClick.AddListener(PlayFromMenu);
 
             var play = UiFactory.CreatePixelButton(frame, "Play", "PLAY", true, 2, PlayFromMenu, out _);
-            UiFactory.Place((RectTransform)play.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -34f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)play.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(96f, 32f));
+
+            _menuDebt = PixelText.Create(frame, "Debt", "", Palette.Bone);
+            UiFactory.Place((RectTransform)_menuDebt.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -58f), Vector2.zero);
 
             var musicLabel = PixelText.Create(frame, "MusicLabel", "MUSIC", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -78f), Vector2.zero);
+            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -84f), Vector2.zero);
 
-            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -78f),
+            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -84f),
                 _ctx.Save.Data.musicVolume, v =>
                 {
                     Music.SetVolume(v);
@@ -274,6 +341,7 @@ namespace SinWheel
         public void ShowMainMenu()
         {
             _menuFragments.Text = $"FRAGMENTS {_ctx.Narrative.FragmentCount}/{NarrativeSystem.TotalFragments}";
+            _menuDebt.Text = $"DEBT {_ctx.Debt.Debt} - QUOTA {_ctx.Debt.Quota}";
             HideVoice();
             _runEndPanel.SetActive(false);
             _menuPanel.SetActive(true);
@@ -289,31 +357,33 @@ namespace SinWheel
             UiFactory.Place(frame, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(VirtualW, VirtualH));
 
             _runEndIntertitle = UiFactory.CreateSpriteImage(frame, "Intertitle", null, new Vector2(128f, 72f));
-            UiFactory.Place((RectTransform)_runEndIntertitle.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 96f), new Vector2(128f, 72f));
+            UiFactory.Place((RectTransform)_runEndIntertitle.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 100f), new Vector2(128f, 72f));
+
+            _debtSeal = UiFactory.CreateSpriteImage(frame, "DebtSeal", null, new Vector2(32f, 32f));
+            UiFactory.Place((RectTransform)_debtSeal.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 52f), new Vector2(32f, 32f));
 
             _runEndQuote = PixelText.Create(frame, "Quote", "", Palette.Dim, 1, PxAlign.Center, 150);
-            UiFactory.Place((RectTransform)_runEndQuote.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 34f), Vector2.zero);
+            UiFactory.Place((RectTransform)_runEndQuote.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 22f), Vector2.zero);
 
             _runEndStats = PixelText.Create(frame, "Stats", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_runEndStats.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), Vector2.zero);
+            UiFactory.Place((RectTransform)_runEndStats.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -22f), Vector2.zero);
 
-            // Fragment plate: blank body in the art, filled at runtime.
             var card = UiFactory.CreateSpriteImage(frame, "FragmentCard", "Narrative/fragment_card", new Vector2(80f, 112f));
-            UiFactory.Place((RectTransform)card.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -4f), new Vector2(80f, 112f));
+            UiFactory.Place((RectTransform)card.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -8f), new Vector2(80f, 112f));
             _fragmentCard = card.gameObject;
             _fragmentText = PixelText.Create(card.transform, "Text", "", Palette.Bone, 1, PxAlign.Center, 64);
             UiFactory.Place((RectTransform)_fragmentText.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -8f), Vector2.zero);
             _fragmentCard.SetActive(false);
 
-            var newRun = UiFactory.CreatePixelButton(frame, "NewRun", "SPIN AGAIN", true, 2, () =>
+            var newRun = UiFactory.CreatePixelButton(frame, "NewRun", "THE FORGE", true, 2, () =>
             {
                 _runEndPanel.SetActive(false);
-                _ctx.Game.StartRun();
+                _forge.Open();
             }, out _);
-            UiFactory.Place((RectTransform)newRun.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -92f), new Vector2(96f, 32f));
+            UiFactory.Place((RectTransform)newRun.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -96f), new Vector2(96f, 32f));
 
             var menu = UiFactory.CreatePixelButton(frame, "Menu", "MENU", false, 1, ShowMainMenu, out _);
-            UiFactory.Place((RectTransform)menu.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -122f), new Vector2(48f, 16f));
+            UiFactory.Place((RectTransform)menu.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -126f), new Vector2(48f, 16f));
 
             _runEndPanel.SetActive(false);
         }
@@ -330,8 +400,25 @@ namespace SinWheel
             var title = PixelText.Create(frame, "Title", "PERMANENT UPGRADES", Palette.Gold);
             UiFactory.Place((RectTransform)title.transform, Top, new Vector2(0f, -20f), Vector2.zero);
 
-            _upgradesContent = UiFactory.CreateRect(frame, "Content");
-            UiFactory.Stretch(_upgradesContent, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(4f, 40f), new Vector2(-4f, -32f));
+            // Every unlocked sin adds a resistance row, so the list has to scroll.
+            var viewport = UiFactory.CreateRect(frame, "Viewport");
+            UiFactory.Stretch(viewport, Vector2.zero, Vector2.one, new Vector2(4f, 40f), new Vector2(-4f, -32f));
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            _upgradesContent = UiFactory.CreateRect(viewport, "Content");
+            _upgradesContent.anchorMin = new Vector2(0f, 1f);
+            _upgradesContent.anchorMax = new Vector2(1f, 1f);
+            _upgradesContent.pivot = new Vector2(0.5f, 1f);
+            _upgradesContent.offsetMin = new Vector2(0f, 0f);
+            _upgradesContent.offsetMax = new Vector2(0f, 0f);
+
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.content = _upgradesContent;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Elastic;
+            scroll.scrollSensitivity = 12f;
 
             var close = UiFactory.CreatePixelButton(frame, "Close", "CLOSE", false, 1,
                 () => _upgradesPanel.SetActive(false), out _);
@@ -352,11 +439,10 @@ namespace SinWheel
             for (int i = _upgradesContent.childCount - 1; i >= 0; i--)
                 Object.Destroy(_upgradesContent.GetChild(i).gameObject);
 
-            float y = -24f;
+            float y = -4f;
             foreach (var cfg in _ctx.Config.Upgrades.upgrades)
             {
-                // Slice scope: meta tree + Sloth's resistance tree.
-                if (cfg.category == "sin_resist" && cfg.sinId != "sloth") continue;
+                if (cfg.category == "sin_resist" && !IsSinUnlocked(cfg.sinId)) continue;
 
                 var row = UiFactory.CreateNineSlice(_upgradesContent, $"Row_{cfg.id}", "UI/panel");
                 UiFactory.Place((RectTransform)row.transform, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(172f, 44f));
@@ -388,12 +474,23 @@ namespace SinWheel
 
                 y -= 50f;
             }
+
+            _upgradesContent.sizeDelta = new Vector2(_upgradesContent.sizeDelta.x, Mathf.Abs(y) + 8f);
+        }
+
+        private bool IsSinUnlocked(string sinId)
+        {
+            foreach (var sin in _ctx.Config.Sins.sins)
+                if (sin.id == sinId) return sin.unlockLevel <= _ctx.Xp.Level;
+            return false;
         }
 
         // --- Per-frame refresh ---
 
         public void Tick()
         {
+            Wheel.SyncToRing();
+
             var hp = _ctx.Health;
             _hpText.Text = $"{Mathf.CeilToInt(hp.CurrentHp)}/{hp.MaxHp}";
             UiFactory.SetPixelBarFill(_hpFill, hp.MaxHp > 0 ? hp.CurrentHp / hp.MaxHp : 0f);
@@ -404,12 +501,54 @@ namespace SinWheel
             _levelText.Text = $"LV {_ctx.Xp.Level}";
             UiFactory.SetPixelBarFill(_xpFill, (float)_ctx.Xp.Xp / Mathf.Max(1, _ctx.Xp.XpToNextLevel()));
 
+            RefreshNotice();
+            RefreshStreak();
+            RefreshQuota();
             RefreshStatusLine();
             RefreshSpinButton();
 
             _bankButton.interactable = _ctx.Game.RunActive
                 && _ctx.Spin.State != SpinState.Spinning
                 && _ctx.Wallet.RunCoins > 0;
+            _titheButton.interactable = _ctx.Game.CanTithe;
+        }
+
+        private void RefreshNotice()
+        {
+            _noticeFill.sprite = ArtSprites.Get(_ctx.Notice.FillSprite);
+            // Snap to whole segments: the meter is eight discrete beats of dread.
+            float segments = Mathf.Max(1f, _ctx.Notice.Segments);
+            _noticeFill.fillAmount = Mathf.Round(_ctx.Notice.Fill * segments) / segments;
+            _noticeEye.sprite = ArtSprites.Get($"Loop/notice_eye_{_ctx.Notice.EyeStage}");
+        }
+
+        private void RefreshStreak()
+        {
+            int count = _ctx.Streak.Count;
+            bool live = _ctx.Streak.IsLive;
+
+            for (int i = 0; i < _streakPips.Count; i++)
+            {
+                string sprite = i < count
+                    ? (live ? "Loop/streak_pip_hot" : "Loop/streak_pip_full")
+                    : "Loop/streak_pip_empty";
+                _streakPips[i].sprite = ArtSprites.Get(sprite);
+            }
+
+            float mult = _ctx.Streak.Multiplier;
+            _multiplierBadge.sprite = ArtSprites.Get(live ? "Loop/multiplier_badge_hot" : "Loop/multiplier_badge");
+            _multiplierText.Text = $"X{mult:0.0}";
+            _multiplierText.Color = live ? Palette.Gold : Palette.Dim;
+        }
+
+        private void RefreshQuota()
+        {
+            float fill = _ctx.Debt.QuotaFill;
+            // Track is 96 wide with a 4px inset each side.
+            var rt = (RectTransform)_quotaMarker.transform;
+            rt.anchoredPosition = new Vector2(4f + Mathf.Round(fill * 88f), 0f);
+            _quotaText.Text = $"{_ctx.Debt.PaidThisRun}/{_ctx.Debt.Quota}";
+            _quotaText.Color = _ctx.Debt.QuotaMet ? Palette.Teal : Palette.Dim;
         }
 
         private void RefreshStatusLine()
@@ -450,7 +589,6 @@ namespace SinWheel
 
         // --- Voice (plates + speech), never modal ---
 
-        /// <summary>Authored arrival plate — the sin's one line, baked into the art.</summary>
         public void ShowArrivalPlate(string sinId)
         {
             _voicePlate.sprite = ArtSprites.Get("Narrative/plate_" + sinId);
@@ -459,7 +597,6 @@ namespace SinWheel
             PresentVoice(2.2f);
         }
 
-        /// <summary>Composed speech: mask + name + line, for everything with variable text.</summary>
         public void ShowSpeech(string speakerId, string line)
         {
             if (string.IsNullOrEmpty(line)) return;
@@ -501,13 +638,14 @@ namespace SinWheel
 
         public void ShowOutcome(OutcomeResult result)
         {
-            SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -160f), 1.2f);
+            SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -164f), 1.2f);
 
             switch (result.Type)
             {
                 case SegmentType.Coins:
                 case SegmentType.Gems:
                 case SegmentType.Xp:
+                case SegmentType.Humility:
                     Sfx.Reward();
                     break;
                 case SegmentType.Damage:
@@ -524,9 +662,34 @@ namespace SinWheel
             }
         }
 
+        /// <summary>A chain worth having just died. Make it hurt for a moment.</summary>
+        public void ShowStreakBreak()
+        {
+            var burst = UiFactory.CreateSpriteImage(_frame, "StreakBreak", "Loop/streak_break", new Vector2(32f, 32f));
+            UiFactory.Place((RectTransform)burst.transform, Top, new Vector2(22f, -65f), new Vector2(32f, 32f));
+            _ctx.CoroutineHost.StartCoroutine(BurstAndFade(burst, 0.4f));
+            Haptics.Heavy();
+            Sfx.Damage();
+        }
+
+        private IEnumerator BurstAndFade(Image img, float lifetime)
+        {
+            var rt = (RectTransform)img.transform;
+            float elapsed = 0f;
+            while (elapsed < lifetime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / lifetime);
+                rt.localScale = Vector3.one * (0.7f + 0.8f * t);
+                img.color = new Color(1f, 1f, 1f, 1f - t);
+                yield return null;
+            }
+            Object.Destroy(img.gameObject);
+        }
+
         public void Toast(string message, Color color)
         {
-            SpawnFloatingText(message, color, 1, new Vector2(0f, -110f), 1.8f);
+            SpawnFloatingText(message, color, 1, new Vector2(0f, -118f), 1.8f);
         }
 
         public void OnRunStarted()
@@ -542,7 +705,7 @@ namespace SinWheel
             _bossStrip.SetActive(true);
             _bossSigil.sprite = ArtSprites.SigilFor(encounter.Config.id);
             _bossName.Text = encounter.Config.displayName;
-            _resistRow.SetActive(encounter.Config.resistThreshold > 0);
+            _bossBreakGlyph.sprite = ArtSprites.Get($"Loop/break_{encounter.Config.id}");
             OnBossUpdated(encounter);
             ShowArrivalPlate(encounter.Config.id);
             Shake();
@@ -551,8 +714,6 @@ namespace SinWheel
         public void OnBossUpdated(BossEncounter encounter)
         {
             _bossStatus.Text = encounter.Modifier.StatusText(encounter);
-            if (encounter.Config.resistThreshold > 0)
-                UiFactory.SetPixelBarFill(_resistFill, (float)encounter.Resist / encounter.Config.resistThreshold);
         }
 
         public void OnBossEnded()
@@ -560,10 +721,11 @@ namespace SinWheel
             _bossStrip.SetActive(false);
         }
 
-        public void ShowRunEnd(bool banked, int bankedAmount, int spins)
+        public void ShowRunEnd(bool banked, int bankedAmount, int spins, DebtOutcome outcome)
         {
             _runEndPanel.SetActive(true);
             _runEndIntertitle.sprite = ArtSprites.Get(banked ? "Narrative/intertitle_bank" : "Narrative/intertitle_bust");
+            _debtSeal.sprite = ArtSprites.Get(DebtSystem.SealSprite(outcome));
 
             string fragment = _ctx.Narrative.ConsumePendingFragment();
             if (!string.IsNullOrEmpty(fragment))
@@ -579,9 +741,14 @@ namespace SinWheel
             {
                 _fragmentCard.SetActive(false);
                 _runEndQuote.Text = _ctx.Narrative.ConsumeRunEndQuote() ?? "";
+
+                var data = _ctx.Save.Data;
+                string verdict = data.lastRunMetQuota ? "QUOTA MET - DEBT FALLS" : "QUOTA MISSED - DEBT RISES";
                 _runEndStats.Text =
-                    (banked ? $"+{bankedAmount} COINS BANKED" : "UNBANKED COINS FORFEIT") +
-                    $"\nSPINS {spins} - BANK {_ctx.Wallet.MetaCoins} - LV {_ctx.Xp.Level}";
+                    $"PAID {data.lastRunPaid} OF {data.lastRunQuota}" +
+                    $"\n{verdict}" +
+                    $"\nDEBT {_ctx.Debt.Debt}" +
+                    $"\nSPINS {spins} - LV {_ctx.Xp.Level}";
             }
         }
 

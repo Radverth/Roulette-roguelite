@@ -73,7 +73,7 @@ namespace SinWheel
         /// an integer factor to keep the grid.
         /// </summary>
         public static Button CreatePixelButton(Transform parent, string name, string label, bool primary,
-            int scale, Action onClick, out PixelText labelText)
+            int scale, Action onClick, out PixelText labelText, string spriteOverride = null)
         {
             var rt = CreateRect(parent, name);
             rt.sizeDelta = new Vector2(48 * scale, 16 * scale);
@@ -82,7 +82,15 @@ namespace SinWheel
             var button = rt.gameObject.AddComponent<Button>();
             button.targetGraphic = img;
 
-            if (primary)
+            if (!string.IsNullOrEmpty(spriteOverride))
+            {
+                img.sprite = ArtSprites.Get(spriteOverride);
+                var overrideColors = button.colors;
+                overrideColors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+                overrideColors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+                button.colors = overrideColors;
+            }
+            else if (primary)
             {
                 img.sprite = ArtSprites.Get("UI/button_primary_idle");
                 button.transition = Selectable.Transition.SpriteSwap;

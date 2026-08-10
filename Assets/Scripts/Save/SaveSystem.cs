@@ -19,6 +19,14 @@ namespace SinWheel
         public int count;
     }
 
+    /// <summary>One wedge in the player's ring. The ring is the build.</summary>
+    [Serializable]
+    public class RingSlot
+    {
+        public string templateId;
+        public int tier = 1;
+    }
+
     /// <summary>Everything that persists across runs. Serialized with JsonUtility.</summary>
     [Serializable]
     public class SaveData
@@ -40,6 +48,18 @@ namespace SinWheel
         public List<CountEntry> sinEncounters = new List<CountEntry>();
         public List<CountEntry> sinDefeats = new List<CountEntry>();
         public List<string> unlockedFragments = new List<string>();
+
+        // The ring (the build), the debt it services, and Forge bookkeeping.
+        public List<RingSlot> ring = new List<RingSlot>();
+        public int debt = -1;              // -1 = uninitialised, seeded from tuning
+        public int quota = -1;
+        public int penaltyRiskWedges;      // one spliced in per unpaid run
+        public int forgeVisits;
+        public int visitsSinceAddOffered;
+        public int visitsSinceStrikeOffered;
+        public int lastRunPaid;            // for the ledger's debt seal
+        public int lastRunQuota;
+        public bool lastRunMetQuota;
 
         public static int GetCount(List<CountEntry> list, string id)
         {

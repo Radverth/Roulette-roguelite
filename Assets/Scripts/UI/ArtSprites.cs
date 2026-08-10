@@ -26,10 +26,11 @@ namespace SinWheel
         public static Sprite IconForSegment(SegmentConfig seg)
         {
             if (!string.IsNullOrEmpty(seg.icon))
-                return Get("Icons/" + seg.icon);
+                return Get(seg.icon.Contains("/") ? seg.icon : "Icons/" + seg.icon);
 
             switch (seg.ParsedType)
             {
+                case SegmentType.Humility: return Get("Loop/break_pride");
                 case SegmentType.Coins: return Get("Icons/seg_coin");
                 case SegmentType.Xp: return Get("Icons/seg_xp");
                 case SegmentType.Gems: return Get("Icons/seg_shard");
