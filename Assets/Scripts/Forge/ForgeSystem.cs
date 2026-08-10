@@ -8,7 +8,8 @@ namespace SinWheel
     {
         Add,
         Strike,
-        Temper
+        Temper,
+        Pledge
     }
 
     public enum ForgeRarity
@@ -28,11 +29,16 @@ namespace SinWheel
         public int TemperSteps = 1;
         public string CursedRiskId;    // cursed Add/Temper drags this in alongside
         public int CursedStrikeSlot = -1;
+        public string PledgeId;        // Pledge: the thing put up against the debt.
         public string Title;
         public string Detail;
 
-        public string CardSprite =>
-            $"Loop/draft_{Rarity.ToString().ToLowerInvariant()}_{Action.ToString().ToLowerInvariant()}";
+        public bool IsPledge => !string.IsNullOrEmpty(PledgeId);
+
+        /// <summary>A Pledge shows its own card; everything else uses the draft frames.</summary>
+        public string CardSprite => IsPledge
+            ? "Pledges/pledge_" + PledgeId
+            : $"Loop/draft_{Rarity.ToString().ToLowerInvariant()}_{Action.ToString().ToLowerInvariant()}";
 
         public string ActionSprite => $"Loop/action_{Action.ToString().ToLowerInvariant()}";
     }
@@ -78,6 +84,13 @@ namespace SinWheel
         public void Take(ForgeOffer offer)
         {
             if (offer == null) return;
+
+            if (offer.IsPledge)
+            {
+                _ctx.Pledges.Take(offer.PledgeId);
+                return;
+            }
+
             var ring = _ctx.Ring;
 
             switch (offer.Action)
@@ -155,12 +168,56 @@ namespace SinWheel
                 if (offer != null) offers.Add(offer);
             }
 
+            // Roughly one offer in three is a Pledge rather than a wedge. It
+            // replaces a card instead of adding a fourth, so the choice stays
+            // "take one of three" no matter what is on the table.
+            var pledge = BuildPledgeOffer();
+            if (pledge != null && offers.Count > 0)
+                offers[_ctx.Rng.Next(offers.Count)] = pledge;
+
             data.visitsSinceAddOffered = offers.Any(o => o.Action == ForgeAction.Add)
                 ? 0 : data.visitsSinceAddOffered + 1;
             data.visitsSinceStrikeOffered = offers.Any(o => o.Action == ForgeAction.Strike)
                 ? 0 : data.visitsSinceStrikeOffered + 1;
 
             return offers;
+        }
+
+        /// <summary>
+        /// A Pledge worth offering: one the player does not already hold, and
+        /// only while a slot is free. Nothing is duller than a card you cannot
+        /// take.
+        /// </summary>
+        private ForgeOffer BuildPledgeOffer()
+        {
+            var pledges = _ctx.Config.Pledges;
+            if (pledges == null || pledges.pledges.Count == 0) return null;
+            if (!_ctx.Pledges.HasRoom) return null;
+            if (_ctx.Rng.NextDouble() >= pledges.offerRate) return null;
+
+            var candidates = pledges.pledges.Where(p => !_ctx.Pledges.Has(p.id)).ToList();
+            if (candidates.Count == 0) return null;
+
+            var pick = candidates[_ctx.Rng.Next(candidates.Count)];
+            return new ForgeOffer
+            {
+                Action = ForgeAction.Pledge,
+                Rarity = PledgeRarity(pick.rarity),
+                PledgeId = pick.id,
+                Title = pick.name,
+                Detail = pick.description
+            };
+        }
+
+        private static ForgeRarity PledgeRarity(string rarity)
+        {
+            switch (rarity)
+            {
+                case "cursed": return ForgeRarity.Cursed;
+                case "rare":
+                case "uncommon": return ForgeRarity.Rare;
+                default: return ForgeRarity.Common;
+            }
         }
 
         private ForgeRarity RollRarity(int ringSize)

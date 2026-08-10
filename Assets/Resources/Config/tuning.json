@@ -44,5 +44,11 @@
   "forgeMaxTier": 3,
   "forgeRerollCost": 50,
 
-  "nearMissChance": 0.6
+  "nearMissChance": 0.6,
+
+  "nudgeCostOne": 1,
+  "nudgeCostTwo": 3,
+  "nudgeWindowBase": 1.2,
+  "nudgeWindowPerTable": 0.1,
+  "nudgeWindowFloor": 0.6
 }

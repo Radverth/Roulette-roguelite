@@ -51,6 +51,10 @@ namespace SinWheel
                 "marks", _ctx.Marks.EarnedCount);
             _ctx.Hud?.OnRunStarted();
 
+            // The Understudy keeps the break reward of the last sin you broke.
+            if (_ctx.Pledges.KeepsLastBreakReward)
+                ApplyRememberedBoon(_ctx.Save.Data.lastBrokenSin);
+
             // The Croupier speaks at run start and run end, nowhere else.
             _ctx.Hud?.ShowSpeech("croupier", _ctx.Narrative.RunStartLine());
         }
@@ -92,9 +96,11 @@ namespace SinWheel
             }
         }
 
-        public bool CanTithe => RunActive
-            && _ctx.Spin.State != SpinState.Spinning
-            && _ctx.Wallet.RunCoins > 0;
+        /// <summary>Only between spins: a landing that has not resolved yet is still in play.</summary>
+        public bool SpinSettled =>
+            _ctx.Spin.State == SpinState.Idle || _ctx.Spin.State == SpinState.Cooldown;
+
+        public bool CanTithe => RunActive && SpinSettled && _ctx.Wallet.RunCoins > 0;
 
         /// <summary>
         /// Pay part of the purse without ending the run. Costs a segment of
@@ -104,12 +110,16 @@ namespace SinWheel
         {
             if (!CanTithe) return;
 
-            int banked = _ctx.Wallet.TitheRunCoins(
-                _ctx.Config.Tuning.tithePercentOfPurse, _ctx.Upgrades.BankingBonusMultiplier());
+            // Iron Tithe: free of Notice, but it will only take so much.
+            float percent = _ctx.Pledges.TitheIsFree
+                ? Mathf.Min(_ctx.Config.Tuning.tithePercentOfPurse, _ctx.Pledges.TitheCapPercent)
+                : _ctx.Config.Tuning.tithePercentOfPurse;
+
+            int banked = _ctx.Wallet.TitheRunCoins(percent, _ctx.Upgrades.BankingBonusMultiplier());
             if (banked <= 0) return;
 
             _ctx.Debt.RecordPayment(banked);
-            _ctx.Notice.OnTithe();
+            if (!_ctx.Pledges.TitheIsFree) _ctx.Notice.OnTithe();
             _ctx.Hud?.Toast($"TITHED {banked}", Palette.Gold);
             Sfx.Reward();
 
@@ -120,7 +130,7 @@ namespace SinWheel
 
         public void BankAndEndRun()
         {
-            if (!RunActive || _ctx.Spin.State == SpinState.Spinning) return;
+            if (!RunActive || !SpinSettled) return;
 
             int banked = _ctx.Wallet.BankRunCoins(_ctx.Upgrades.BankingBonusMultiplier());
             _ctx.Debt.RecordPayment(banked);
@@ -144,6 +154,9 @@ namespace SinWheel
                 _ctx.Save.Data.consecutiveInstantBanks = 0;
             }
 
+            // Ash Ledger arms itself on a bank and spends on the next run.
+            if (_ctx.Pledges.Has("ash_ledger")) _ctx.Save.Data.ashLedgerCharged = true;
+
             _ctx.Analytics.Track("bank", "amount", banked, "spins", SpinsThisRun);
             EndRun(banked: true, bankedAmount: banked);
         }
@@ -160,8 +173,17 @@ namespace SinWheel
             if (!banked)
                 _ctx.Wallet.ResetRun(); // unbanked winnings are forfeit
 
+            // Widow's Debt: busting is not merely a loss, it compounds.
+            if (!banked && _ctx.Pledges.DoublesDebtOnBust)
+            {
+                _ctx.Save.Data.debt *= 2;
+                _ctx.Hud?.Toast("THE DEBT DOUBLES", Palette.Blood);
+            }
+
             LastDebtOutcome = _ctx.Debt.Settle();
             LastMarksEarned = _ctx.Marks.CheckForNewMarks();
+            // The house reclaims what was pledged as the debt clears.
+            if (LastMarksEarned.Count > 0) _ctx.Pledges.ReclaimOnMark();
 
             if (_ctx.Tables.CurrentTable > _ctx.Save.Data.deepestTable)
                 _ctx.Save.Data.deepestTable = _ctx.Tables.CurrentTable;
@@ -176,6 +198,21 @@ namespace SinWheel
                 "table", _ctx.Tables.CurrentTable, "marks", _ctx.Marks.EarnedCount);
 
             _ctx.Hud?.ShowRunEnd(banked, bankedAmount, SpinsThisRun, LastDebtOutcome);
+        }
+
+        /// <summary>Understudy: the last boon you earned is yours again on arrival.</summary>
+        private void ApplyRememberedBoon(string sinId)
+        {
+            if (string.IsNullOrEmpty(sinId)) return;
+            switch (sinId)
+            {
+                case "sloth": _ctx.Run.SlothCooldownBonus = 0.3f; break;
+                case "pride": _ctx.Run.PrideOddsLocked = true; break;
+                case "lust": _ctx.Run.LustRingLocked = true; break;
+                case "wrath": _ctx.Run.ExtraWedges.Add("coin_mid"); break;
+                default: _ctx.Run.GuaranteedRewardSpins++; break;
+            }
+            _ctx.Hud?.Toast($"UNDERSTUDY KEEPS {sinId.ToUpperInvariant()}", Palette.Teal);
         }
 
         private void HandleLevelUp(int newLevel)

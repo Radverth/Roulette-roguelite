@@ -38,6 +38,11 @@ namespace SinWheel
         public MarkSystem Marks;
         public InterludeSystem Interludes;
 
+        // The spin itself: what you can buy inside it, and what you have
+        // pledged to be able to.
+        public PledgeSystem Pledges;
+        public NudgeSystem Nudge;
+
         public SinBossSystem Bosses;
         public SpinSystem Spin;
         public GameManager Game;

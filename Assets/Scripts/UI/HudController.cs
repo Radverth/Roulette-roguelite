@@ -29,7 +29,6 @@ namespace SinWheel
         private Image _hpFill;
         private PixelText _runCoinsText;
         private PixelText _metaCoinsText;
-        private PixelText _gemsText;
         private PixelText _levelText;
         private Image _xpFill;
         private PixelText _statusLine;
@@ -85,6 +84,22 @@ namespace SinWheel
         private Image _bossSigilSecond;
         private RectTransform _foresightRow;
 
+        private RectTransform _nudgeRow;
+        private Button _nudgeLeft;
+        private Image _nudgeLeftIcon;
+        private Button _nudgeRight;
+        private Image _nudgeRightIcon;
+        private RectTransform _nudgeCostRow;
+        private Image _nudgeCharge;
+        private readonly List<Image> _nudgeCostPips = new List<Image>();
+
+        private RectTransform _pledgeColumn;
+        private readonly List<Image> _pledgeEmblems = new List<Image>();
+        private string _pledgeSignature = "";
+
+        private ScorePanel _scorePanel;
+        private PledgeScreen _pledges;
+
         private ForgeScreen _forge;
         private TutorialScreen _tutorial;
         private TableInviteScreen _tableInvite;
@@ -129,10 +144,14 @@ namespace SinWheel
             BuildWheelArea();
             BuildBottomBar();
             BuildVoiceSlot();
+            BuildNudgeControls();
+            BuildPledgeColumn();
             BuildRunEndPanel();
             BuildUpgradesPanel();
             BuildMainMenu();
 
+            _scorePanel = new ScorePanel(_ctx, _frame);
+            _pledges = new PledgeScreen(_ctx, _root, null);
             _forge = new ForgeScreen(_ctx, _root, () => _ctx.Game.StartRun());
             _tutorial = new TutorialScreen(_ctx, _root, OnTutorialClosed);
             _tableInvite = new TableInviteScreen(_ctx, _root, OnTableAccepted);
@@ -200,11 +219,6 @@ namespace SinWheel
             UiFactory.Place((RectTransform)relicIcon.transform, Top, new Vector2(-24f, -37f), new Vector2(16f, 16f));
             _metaCoinsText = PixelText.Create(_shakeRoot, "MetaCoins", "0", Palette.Bone, 1, PxAlign.Left);
             UiFactory.Place((RectTransform)_metaCoinsText.transform, Top, new Vector2(-14f, -37f), Vector2.zero);
-
-            var shardIcon = UiFactory.CreateSpriteImage(_shakeRoot, "ShardIcon", "Icons/seg_shard", new Vector2(16f, 16f));
-            UiFactory.Place((RectTransform)shardIcon.transform, Top, new Vector2(38f, -37f), new Vector2(16f, 16f));
-            _gemsText = PixelText.Create(_shakeRoot, "Gems", "0", Palette.Purple, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)_gemsText.transform, Top, new Vector2(48f, -37f), Vector2.zero);
 
             _levelText = PixelText.Create(_shakeRoot, "Level", "LV 1", Palette.Teal, 1, PxAlign.Left);
             UiFactory.Place((RectTransform)_levelText.transform, Top, new Vector2(-86f, -50f), Vector2.zero);
@@ -310,7 +324,7 @@ namespace SinWheel
         private void BuildBottomBar()
         {
             _spinButton = UiFactory.CreatePixelButton(_shakeRoot, "SpinButton", "SPIN", true, 2,
-                () => _ctx.Spin.RequestSpin(), out _spinLabel);
+                OnSpinPressed, out _spinLabel);
             UiFactory.Place((RectTransform)_spinButton.transform, Top, new Vector2(0f, -287f), new Vector2(96f, 32f));
 
             _titheButton = UiFactory.CreatePixelButton(_shakeRoot, "TitheButton", "TITHE", false, 1,
@@ -324,6 +338,105 @@ namespace SinWheel
             var upgrades = UiFactory.CreatePixelButton(_shakeRoot, "UpgradesButton", "UPGRADE", false, 1,
                 ToggleUpgradesPanel, out _);
             UiFactory.Place((RectTransform)upgrades.transform, Top, new Vector2(58f, -313f), new Vector2(48f, 16f));
+        }
+
+        /// <summary>
+        /// The decision inside the spin. Two thumbs flanking SPIN, and the
+        /// price in Notice segments directly above them - the player is never
+        /// asked to cheat without being shown the bill first.
+        /// </summary>
+        private void BuildNudgeControls()
+        {
+            _nudgeRow = UiFactory.CreateRect(_shakeRoot, "NudgeRow");
+            UiFactory.Stretch(_nudgeRow, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            _nudgeLeft = CreateNudgeButton("NudgeLeft", -70f, -1, out _nudgeLeftIcon);
+            _nudgeRight = CreateNudgeButton("NudgeRight", 70f, 1, out _nudgeRightIcon);
+
+            _nudgeCostRow = UiFactory.CreateRect(_nudgeRow, "NudgeCost");
+            UiFactory.Place(_nudgeCostRow, Top, new Vector2(0f, -266f), new Vector2(48f, 10f));
+
+            // The bar drains with the window. Filled rather than scaled, so
+            // every frame of it still lands on whole pixels.
+            _nudgeCharge = UiFactory.CreateSpriteImage(_nudgeCostRow, "ChargeBar", "Pledges/nudge_charge_bar",
+                new Vector2(48f, 10f));
+            UiFactory.Place((RectTransform)_nudgeCharge.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(48f, 10f));
+            _nudgeCharge.type = Image.Type.Filled;
+            _nudgeCharge.fillMethod = Image.FillMethod.Horizontal;
+            _nudgeCharge.fillOrigin = (int)Image.OriginHorizontal.Left;
+
+            for (int i = 0; i < 3; i++)
+            {
+                var pip = UiFactory.CreateSpriteImage(_nudgeCostRow, $"Pip_{i}", "Pledges/nudge_cost_pip_free",
+                    new Vector2(8f, 10f));
+                UiFactory.Place((RectTransform)pip.transform, new Vector2(0.5f, 0.5f),
+                    new Vector2(-9f + i * 9f, 0f), new Vector2(8f, 10f));
+                _nudgeCostPips.Add(pip);
+            }
+
+            _nudgeRow.gameObject.SetActive(false);
+        }
+
+        private Button CreateNudgeButton(string name, float x, int direction, out Image icon)
+        {
+            icon = UiFactory.CreateSpriteImage(_nudgeRow, name, "Pledges/nudge_left_ready", new Vector2(28f, 28f));
+            UiFactory.Place((RectTransform)icon.transform, Top, new Vector2(x, -287f), new Vector2(28f, 28f));
+
+            // CreateSpriteImage opts out of raycasts by default; a button must opt back in.
+            icon.raycastTarget = true;
+
+            var button = icon.gameObject.AddComponent<Button>();
+            button.targetGraphic = icon;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(() => _ctx.Spin.Nudge(direction));
+            return button;
+        }
+
+        /// <summary>
+        /// The build, down the left of the wheel: five emblems clear of the
+        /// disc, each one a door into the Pledge screen.
+        /// </summary>
+        private void BuildPledgeColumn()
+        {
+            _pledgeColumn = UiFactory.CreateRect(_shakeRoot, "PledgeColumn");
+            UiFactory.Stretch(_pledgeColumn, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            for (int i = 0; i < 5; i++)
+            {
+                var emblem = UiFactory.CreateSpriteImage(_pledgeColumn, $"Emblem_{i}", null, new Vector2(24f, 24f));
+                UiFactory.Place((RectTransform)emblem.transform, Top,
+                    new Vector2(-78f, -148f - i * 24f), new Vector2(24f, 24f));
+
+                emblem.raycastTarget = true;
+                var button = emblem.gameObject.AddComponent<Button>();
+                button.targetGraphic = emblem;
+                button.transition = Selectable.Transition.None;
+                button.onClick.AddListener(OpenPledges);
+
+                emblem.gameObject.SetActive(false);
+                _pledgeEmblems.Add(emblem);
+            }
+        }
+
+        public void OpenPledges()
+        {
+            Sfx.Tick();
+            _pledges.Open();
+        }
+
+        /// <summary>
+        /// One button, two verbs. While the nudge window is open it takes what
+        /// is under the pointer instead — nobody should be made to wait out a
+        /// decision they have already made.
+        /// </summary>
+        private void OnSpinPressed()
+        {
+            if (_ctx.Spin.State == SpinState.Nudging)
+            {
+                _ctx.Spin.CommitLanding();
+                return;
+            }
+            _ctx.Spin.RequestSpin();
         }
 
         private void BuildVoiceSlot()
@@ -411,6 +524,10 @@ namespace SinWheel
 
             _menuFragments = PixelText.Create(frame, "Fragments", "", Palette.Dim);
             UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -130f), Vector2.zero);
+
+            var pledgeButton = UiFactory.CreatePixelButton(frame, "Pledges", "PLEDGES", false, 1,
+                OpenPledges, out _);
+            UiFactory.Place((RectTransform)pledgeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -146f), new Vector2(64f, 16f));
 
             _menuPanel.SetActive(false);
         }
@@ -609,7 +726,6 @@ namespace SinWheel
 
             _runCoinsText.Text = _ctx.Wallet.RunCoins.ToString();
             _metaCoinsText.Text = _ctx.Wallet.MetaCoins.ToString();
-            _gemsText.Text = _ctx.Wallet.Gems.ToString();
             _levelText.Text = $"LV {_ctx.Xp.Level}";
             UiFactory.SetPixelBarFill(_xpFill, (float)_ctx.Xp.Xp / Mathf.Max(1, _ctx.Xp.XpToNextLevel()));
 
@@ -618,12 +734,13 @@ namespace SinWheel
             RefreshStreak();
             RefreshQuota();
             RefreshForesight();
+            RefreshPledges();
+            RefreshNudge();
             RefreshStatusLine();
             RefreshSpinButton();
 
-            _bankButton.interactable = _ctx.Game.RunActive
-                && _ctx.Spin.State != SpinState.Spinning
-                && _ctx.Wallet.RunCoins > 0;
+            bool settled = _ctx.Spin.State == SpinState.Idle || _ctx.Spin.State == SpinState.Cooldown;
+            _bankButton.interactable = _ctx.Game.RunActive && settled && _ctx.Wallet.RunCoins > 0;
             _titheButton.interactable = _ctx.Game.CanTithe;
         }
 
@@ -702,8 +819,60 @@ namespace SinWheel
             _quotaText.Color = _ctx.Debt.QuotaMet ? Palette.Teal : Palette.Dim;
         }
 
+        /// <summary>
+        /// The five emblems, rebuilt only when the build actually changes -
+        /// this runs every frame and a Pledge is taken once a run at most.
+        /// </summary>
+        private void RefreshPledges()
+        {
+            var held = _ctx.Pledges.Held;
+            string signature = string.Join(",", held);
+            if (signature == _pledgeSignature) return;
+            _pledgeSignature = signature;
+
+            for (int i = 0; i < _pledgeEmblems.Count; i++)
+            {
+                bool filled = i < held.Count;
+                _pledgeEmblems[i].gameObject.SetActive(filled);
+                if (!filled) continue;
+
+                var cfg = _ctx.Pledges.Get(held[i]);
+                _pledgeEmblems[i].sprite = ArtSprites.Get(cfg != null ? cfg.EmblemSprite : null);
+            }
+        }
+
+        private void RefreshNudge()
+        {
+            if (!_ctx.Nudge.WindowOpen) return;
+
+            _nudgeLeftIcon.sprite = ArtSprites.Get(_ctx.Nudge.ButtonSprite(true));
+            _nudgeRightIcon.sprite = ArtSprites.Get(_ctx.Nudge.ButtonSprite(false));
+
+            bool can = _ctx.Nudge.CanNudge;
+            _nudgeLeft.interactable = can;
+            _nudgeRight.interactable = can;
+
+            // The bill for the next push, in Notice segments.
+            int cost = can ? _ctx.Nudge.NextCost : 0;
+            for (int i = 0; i < _nudgeCostPips.Count; i++)
+                _nudgeCostPips[i].sprite = ArtSprites.Get(i < cost
+                    ? "Pledges/nudge_cost_pip_spent" : "Pledges/nudge_cost_pip_free");
+
+            // The window draining is the whole tension; show it on the bar,
+            // snapped to whole pixels of the 48px track.
+            float remaining = _ctx.Nudge.WindowLength > 0f
+                ? Mathf.Clamp01(_ctx.Nudge.WindowRemaining / _ctx.Nudge.WindowLength) : 0f;
+            _nudgeCharge.fillAmount = Mathf.Round(remaining * 48f) / 48f;
+        }
+
         private void RefreshStatusLine()
         {
+            // The decision inside the spin gets the slot to itself.
+            bool nudging = _ctx.Nudge.WindowOpen;
+            if (_statusLine.gameObject.activeSelf == nudging)
+                _statusLine.gameObject.SetActive(!nudging);
+            if (nudging) return;
+
             int buffs = 0, debuffs = 0;
             foreach (var e in _ctx.Buffs.Effects)
             {
@@ -728,6 +897,10 @@ namespace SinWheel
                     _spinLabel.Text = "...";
                     _spinButton.interactable = false;
                     break;
+                case SpinState.Nudging:
+                    _spinLabel.Text = "TAKE";
+                    _spinButton.interactable = true;
+                    break;
                 case SpinState.Cooldown:
                     _spinLabel.Text = $"{_ctx.Spin.CooldownRemaining:0.0}";
                     _spinButton.interactable = false;
@@ -737,6 +910,29 @@ namespace SinWheel
                     _spinButton.interactable = _ctx.Game.RunActive;
                     break;
             }
+        }
+
+        // --- The nudge window ---
+
+        /// <summary>The wheel has settled and nothing has been paid yet.</summary>
+        public void OnNudgeWindowOpened()
+        {
+            _nudgeRow.gameObject.SetActive(true);
+            Wheel.ShowNudgeGhosts(true);
+            RefreshNudge();
+        }
+
+        /// <summary>A push landed: the ghosts follow the pointer to its new home.</summary>
+        public void OnNudged()
+        {
+            Wheel.ShowNudgeGhosts(true);
+            RefreshNudge();
+        }
+
+        public void OnNudgeWindowClosed()
+        {
+            _nudgeRow.gameObject.SetActive(false);
+            Wheel.ShowNudgeGhosts(false);
         }
 
         // --- Voice (plates + speech), never modal ---
@@ -790,15 +986,18 @@ namespace SinWheel
 
         public void ShowOutcome(OutcomeResult result)
         {
-            SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -181f), 1.2f);
+            // Below two terms the assembly is noise, so the float alone says it.
+            bool assembled = result.Score != null && result.Score.WorthShowing;
+            if (assembled) _scorePanel.Show(result.Score);
+            else SpawnFloatingText(result.Text, result.Color, 2, new Vector2(0f, -181f), 1.2f);
 
             switch (result.Type)
             {
                 case SegmentType.Coins:
-                case SegmentType.Gems:
                 case SegmentType.Xp:
                 case SegmentType.Humility:
-                    Sfx.Reward();
+                    // The assembly plays its own chime when the plate lands.
+                    if (!assembled) Sfx.Reward();
                     break;
                 case SegmentType.Damage:
                 case SegmentType.CoinLoss:
@@ -846,6 +1045,8 @@ namespace SinWheel
 
         public void OnRunStarted()
         {
+            _scorePanel.HideImmediate();
+            OnNudgeWindowClosed();
             _menuPanel.SetActive(false);
             _runEndPanel.SetActive(false);
             _bossStrip.SetActive(false);

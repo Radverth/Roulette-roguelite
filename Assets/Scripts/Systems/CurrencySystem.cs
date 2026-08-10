@@ -60,11 +60,6 @@ namespace SinWheel
             return true;
         }
 
-        public void AddGems(int amount)
-        {
-            _ctx.Save.Data.gems = Mathf.Max(0, _ctx.Save.Data.gems + amount);
-        }
-
         /// <summary>
         /// Partial bank: convert part of the purse and keep spinning. Safety
         /// now, bought with attention later — the caller raises Notice.

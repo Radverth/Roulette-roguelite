@@ -55,6 +55,7 @@ namespace SinWheel
         {
             if (slotIndex < 0 || slotIndex >= Slots.Count) return;
             Slots.RemoveAt(slotIndex);
+            _ctx.Save.Data.wedgesStruck++; // Gravedigger's Cut remembers
             Rebuild();
         }
 
@@ -168,6 +169,13 @@ namespace SinWheel
                 var wedge = template.Clone();
                 wedge.id = "damage_house";
                 ring.Insert(Mathf.Min(ring.Count, 5 + i * 4), wedge);
+            }
+
+            // Hollow Coin: the jackpot is in there twice.
+            if (_ctx.Pledges != null && _ctx.Pledges.DoubleJackpot)
+            {
+                var jackpot = Template("jackpot");
+                if (jackpot != null) ring.Insert(Mathf.Min(ring.Count, ring.Count / 3), jackpot.Clone());
             }
 
             if (_ctx.Bosses != null && _ctx.Bosses.EncounterActive)

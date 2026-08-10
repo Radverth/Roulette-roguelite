@@ -55,6 +55,10 @@ namespace SinWheel
         public int debt = -1;              // -1 = uninitialised, seeded from tuning
         public int quota = -1;
         public int penaltyRiskWedges;      // one spliced in per unpaid run
+        public List<string> pledges = new List<string>();
+        public int wedgesStruck;            // Gravedigger's Cut counts forever
+        public bool ashLedgerCharged;       // banking arms it for the next run
+        public string lastBrokenSin;        // the Understudy keeps this reward
         public int marksEarned;
         public int deepestTable = 1;
         public int forgeVisits;

@@ -21,12 +21,15 @@ namespace SinWheel
     public sealed class WheelController
     {
         private const float IconRadius = 42f;
+        private const float GhostRadius = 44f;
 
         private readonly GameContext _ctx;
         private readonly RectTransform _container;
         private readonly RectTransform _disc;
         private readonly Image _discImage;
         private readonly Image _flash;
+        private Image _ghostLeft;
+        private Image _ghostRight;
         private readonly List<Image> _icons = new List<Image>();
 
         private int _ringVersion = -1;
@@ -118,6 +121,71 @@ namespace SinWheel
             }
         }
 
+        /// <summary>
+        /// Push the settled wheel to a neighbouring wedge. Snaps rather than
+        /// eases: the spin is over, this is the player's hand on the rim.
+        /// </summary>
+        public void NudgeTo(int index)
+        {
+            float arc = Arc;
+            float target = index * arc;
+            _currentRotation = Mathf.Repeat(target, 360f);
+            _disc.localRotation = Quaternion.Euler(0f, 0f, _currentRotation);
+            Sfx.Tick();
+        }
+
+        /// <summary>
+        /// Outline the two wedges a push would bring under the pointer. Never
+        /// filled — a ghost must not be mistakable for a settled result. They
+        /// live on the container rather than the disc, so they mark screen
+        /// positions and stay put while the disc turns beneath them.
+        /// </summary>
+        public void ShowNudgeGhosts(bool show)
+        {
+            if (_ghostLeft == null)
+            {
+                _ghostLeft = CreateGhost("GhostLeft");
+                _ghostRight = CreateGhost("GhostRight");
+            }
+
+            if (show)
+            {
+                float arc = Arc;
+                PlaceGhost(_ghostLeft, 90f + arc);
+                PlaceGhost(_ghostRight, 90f - arc);
+            }
+
+            _ghostLeft.gameObject.SetActive(show);
+            _ghostRight.gameObject.SetActive(show);
+        }
+
+        private Image CreateGhost(string name)
+        {
+            var ghost = UiFactory.CreateSpriteImage(_container, name, "Pledges/nudge_ghost", new Vector2(24f, 32f));
+            ghost.raycastTarget = false;
+            ghost.gameObject.SetActive(false);
+            return ghost;
+        }
+
+        private static void PlaceGhost(Image ghost, float degrees)
+        {
+            float rad = degrees * Mathf.Deg2Rad;
+            var pos = new Vector2(Mathf.Cos(rad) * GhostRadius, Mathf.Sin(rad) * GhostRadius);
+            var rt = (RectTransform)ghost.transform;
+            UiFactory.Place(rt, new Vector2(0.5f, 0.5f), pos, new Vector2(24f, 32f));
+            // Stands up along the spoke, so it reads as a wedge and not a badge.
+            rt.localRotation = Quaternion.Euler(0f, 0f, degrees - 90f);
+        }
+
+        /// <summary>Blind Wager: the wheel is hidden while it turns.</summary>
+        public void SetHidden(bool hidden)
+        {
+            float alpha = hidden ? 0f : 1f;
+            _discImage.color = new Color(1f, 1f, 1f, alpha);
+            foreach (var icon in _icons)
+                if (icon != null) icon.color = new Color(1f, 1f, 1f, alpha);
+        }
+
         /// <summary>Spin so wedge <paramref name="index"/> lands under the pointer.</summary>
         public void SpinTo(int index, float duration, Action onComplete)
         {
@@ -125,6 +193,7 @@ namespace SinWheel
             IsSpinning = true;
             if (_flashRoutine != null) _ctx.CoroutineHost.StopCoroutine(_flashRoutine);
             _flash.gameObject.SetActive(false);
+            if (_ctx.Pledges.HidesWheel) SetHidden(true);
             _ctx.CoroutineHost.StartCoroutine(SpinRoutine(index, duration, onComplete));
         }
 
@@ -160,6 +229,7 @@ namespace SinWheel
             _disc.localRotation = Quaternion.Euler(0f, 0f, target);
             _currentRotation = Mathf.Repeat(target, 360f);
 
+            SetHidden(false);
             Sfx.Land();
             Haptics.Light();
             _flashRoutine = _ctx.CoroutineHost.StartCoroutine(FlashRoutine());
@@ -199,7 +269,6 @@ namespace SinWheel
             if (seg.IsRisk) return -1f;
             switch (seg.ParsedType)
             {
-                case SegmentType.Gems: return 100f;      // rarest thing on the wheel
                 case SegmentType.Coins: return seg.EffectiveAmount;
                 case SegmentType.Xp: return seg.EffectiveAmount * 0.5f;
                 default: return 5f;

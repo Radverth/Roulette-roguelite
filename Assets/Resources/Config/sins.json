@@ -13,8 +13,8 @@
       "breakHint": "SPIN UNBROKEN",
       "rewardMultiplierStart": 1.5,
       "rewardMultiplierPerSpin": 0.1,
-      "defeatCoins": 120,
-      "defeatGems": 3,
+      "defeatCoins": 195,
+      "defeatGems": 0,
       "surviveCoins": 50,
       "colorHex": "#4A6478"
     },
@@ -30,8 +30,8 @@
       "breakHint": "TITHE TO ESCAPE",
       "rewardMultiplierStart": 1.8,
       "rewardMultiplierPerSpin": 0.15,
-      "defeatCoins": 300,
-      "defeatGems": 6,
+      "defeatCoins": 450,
+      "defeatGems": 0,
       "surviveCoins": 120,
       "colorHex": "#A85535"
     },
@@ -49,8 +49,8 @@
       "breakHint": "3 HUMILITY IN A ROW",
       "rewardMultiplierStart": 1.4,
       "rewardMultiplierPerSpin": 0.1,
-      "defeatCoins": 140,
-      "defeatGems": 3,
+      "defeatCoins": 215,
+      "defeatGems": 0,
       "surviveCoins": 60,
       "colorHex": "#6B3FA0"
     },
@@ -66,8 +66,8 @@
       "breakHint": "LAND THE JACKPOT",
       "rewardMultiplierStart": 1.6,
       "rewardMultiplierPerSpin": 0.1,
-      "defeatCoins": 200,
-      "defeatGems": 4,
+      "defeatCoins": 300,
+      "defeatGems": 0,
       "surviveCoins": 70,
       "colorHex": "#8F9B3F"
     },
@@ -85,8 +85,8 @@
       "breakHint": "TAKE 3 WOUNDS ABOVE 25%",
       "rewardMultiplierStart": 1.7,
       "rewardMultiplierPerSpin": 0.15,
-      "defeatCoins": 220,
-      "defeatGems": 4,
+      "defeatCoins": 320,
+      "defeatGems": 0,
       "surviveCoins": 80,
       "colorHex": "#B02A44"
     },
@@ -101,8 +101,8 @@
       "breakHint": "LAND AN UNTOUCHED WEDGE",
       "rewardMultiplierStart": 1.6,
       "rewardMultiplierPerSpin": 0.12,
-      "defeatCoins": 240,
-      "defeatGems": 5,
+      "defeatCoins": 365,
+      "defeatGems": 0,
       "surviveCoins": 90,
       "colorHex": "#2E8C7A"
     },
@@ -118,8 +118,8 @@
       "breakHint": "SAME WEDGE TWICE",
       "rewardMultiplierStart": 1.7,
       "rewardMultiplierPerSpin": 0.12,
-      "defeatCoins": 260,
-      "defeatGems": 5,
+      "defeatCoins": 385,
+      "defeatGems": 0,
       "surviveCoins": 100,
       "colorHex": "#3C4FA8"
     }

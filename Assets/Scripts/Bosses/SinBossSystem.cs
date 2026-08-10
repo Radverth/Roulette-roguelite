@@ -45,6 +45,10 @@ namespace SinWheel
 
         public bool AtSinCapacity => _encounters.Count >= _ctx.Tables.MaxActiveSins;
 
+        /// <summary>Seventh Hour: at the deepest table, nothing may come for you.</summary>
+        public bool SinsSilenced =>
+            _ctx.Pledges.SinsDisabledAtLastTable && _ctx.Tables.AtLastTable;
+
         public SinBossSystem(GameContext ctx)
         {
             _ctx = ctx;
@@ -68,6 +72,7 @@ namespace SinWheel
             var active = ActiveSinIds();
             return _ctx.Config.Sins.sins
                 .Where(s => s.implemented && s.unlockLevel <= _ctx.Xp.Level && !active.Contains(s.id))
+                .Where(s => !(_ctx.Pledges.PrideBanished && s.id == "pride"))
                 .ToList();
         }
 
@@ -79,6 +84,8 @@ namespace SinWheel
                 float dmg = _ctx.Health.ApplyDamage(5f * _ctx.Buffs.DamageMultiplier);
                 return $"THE SIN STIRS -{Mathf.RoundToInt(dmg)} HP";
             }
+
+            if (SinsSilenced) return "THE HOUR IS YOURS";
 
             var candidates = UnlockedSins();
             if (candidates.Count == 0)
@@ -105,6 +112,7 @@ namespace SinWheel
         public bool TryForcedSummon(SegmentConfig landed)
         {
             if (AtSinCapacity || !landed.IsRisk || !_ctx.Notice.IsFull || InGracePeriod) return false;
+            if (SinsSilenced) return false;
 
             var candidates = UnlockedSins();
             if (candidates.Count == 0) return false;
@@ -133,7 +141,7 @@ namespace SinWheel
                 Config = cfg,
                 Modifier = BossModifierFactory.Create(_ctx, cfg),
                 // Mark III: they outstay their welcome.
-                SpinsRemaining = cfg.durationSpins + _ctx.Marks.SinDurationBonus,
+                SpinsRemaining = cfg.durationSpins + _ctx.Marks.SinDurationBonus + _ctx.Pledges.SinDurationBonus,
                 SpinsElapsed = 0
             };
             _encounters.Add(encounter);
@@ -266,9 +274,12 @@ namespace SinWheel
                 encounter.Modifier.OnBroken(encounter);
                 _ctx.Wallet.AddRunCoins(cfg.defeatCoins);
                 _ctx.Tables.RecordCoinsEarned(cfg.defeatCoins);
-                _ctx.Wallet.AddGems(cfg.defeatGems);
                 _ctx.Notice.OnSinBroken();
-                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} BROKEN +{cfg.defeatCoins}C +{cfg.defeatGems}G", Palette.Gold);
+                // Sexton's Key turns a broken sin into fuel for more nudges.
+                if (_ctx.Pledges.NoticeRefundOnBreak > 0f)
+                    _ctx.Notice.Add(-_ctx.Pledges.NoticeRefundOnBreak);
+                _ctx.Save.Data.lastBrokenSin = cfg.id;
+                _ctx.Hud?.Toast($"{cfg.displayName.ToUpperInvariant()} BROKEN +{cfg.defeatCoins}", Palette.Gold);
 
                 int defeats = SaveData.IncrementCount(_ctx.Save.Data.sinDefeats, cfg.id);
                 string fragKey = cfg.id + "_3";
