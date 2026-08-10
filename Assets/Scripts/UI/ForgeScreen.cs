@@ -23,6 +23,7 @@ namespace SinWheel
         private PixelText _ringSummary;
         private Button _rerollButton;
         private PixelText _rerollLabel;
+        private PixelText _hint;
 
         public bool IsOpen => _panel != null && _panel.activeSelf;
 
@@ -61,8 +62,10 @@ namespace SinWheel
             var skip = UiFactory.CreatePixelButton(frame, "Skip", "SKIP", false, 1, Skip, out _);
             UiFactory.Place((RectTransform)skip.transform, new Vector2(0.5f, 0f), new Vector2(38f, 74f), new Vector2(48f, 16f));
 
-            var hint = PixelText.Create(frame, "Hint", "TAKE ONE. THE REST BURN.", Palette.Dim);
-            UiFactory.Place((RectTransform)hint.transform, new Vector2(0.5f, 0f), new Vector2(0f, 50f), Vector2.zero);
+            // Doubles as the reading desk: a Pledge is a rule change and needs
+            // more words than fit on a 40px card, so its text lands here.
+            _hint = PixelText.Create(frame, "Hint", "TAKE ONE. THE REST BURN.", Palette.Dim, 1, PxAlign.Center, 164);
+            UiFactory.Place((RectTransform)_hint.transform, new Vector2(0.5f, 0f), new Vector2(0f, 46f), Vector2.zero);
 
             _panel.SetActive(false);
         }
@@ -86,6 +89,10 @@ namespace SinWheel
             for (int i = 0; i < offers.Count; i++)
                 BuildCard(offers[i], new Vector2(x0 + i * pitch, 0f));
 
+            var pledge = offers.Find(o => o.IsPledge);
+            _hint.Text = pledge != null ? pledge.Detail : "TAKE ONE. THE REST BURN.";
+            _hint.Color = pledge != null ? Palette.Bone : Palette.Dim;
+
             _ringSummary.Text = $"RING {_ctx.Ring.Slots.Count} WEDGES";
             _rerollLabel.Text = _ctx.Forge.RerollUsed ? "USED" : _ctx.Forge.RerollCost.ToString();
             _rerollButton.interactable = _ctx.Forge.CanReroll;
@@ -93,8 +100,12 @@ namespace SinWheel
 
         private void BuildCard(ForgeOffer offer, Vector2 position)
         {
+            // Pledge art is authored at its own size; stretching it to the
+            // draft frame would break the pixel grid.
+            var size = offer.IsPledge ? new Vector2(40f, 56f) : new Vector2(48f, 68f);
+
             var card = UiFactory.CreateRect(_cardRow, "Card");
-            UiFactory.Place(card, new Vector2(0.5f, 0.5f), position, new Vector2(48f, 68f));
+            UiFactory.Place(card, new Vector2(0.5f, 0.5f), position, size);
 
             var img = card.gameObject.AddComponent<Image>();
             img.sprite = ArtSprites.Get(offer.CardSprite);
@@ -102,6 +113,15 @@ namespace SinWheel
             var button = card.gameObject.AddComponent<Button>();
             button.targetGraphic = img;
             button.onClick.AddListener(() => Take(offer));
+
+            if (offer.IsPledge)
+            {
+                var pledgeName = PixelText.Create(_cardRow, "PledgeName", offer.Title ?? "", Palette.Gold, 1,
+                    PxAlign.Center, 56);
+                UiFactory.Place((RectTransform)pledgeName.transform, new Vector2(0.5f, 0.5f),
+                    position + new Vector2(0f, -36f), Vector2.zero);
+                return;
+            }
 
             // The card art leaves a well in the middle; the target wedge goes there.
             var template = string.IsNullOrEmpty(offer.TemplateId) ? null : _ctx.Ring.Template(offer.TemplateId);

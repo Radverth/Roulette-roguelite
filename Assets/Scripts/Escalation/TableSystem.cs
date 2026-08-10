@@ -135,7 +135,12 @@ namespace SinWheel
         public int MaxActiveSins => Mathf.Max(1, Current.maxActiveSins);
         public int ExtraRiskWedges => Current.extraRiskWedges;
 
-        public bool IsCroupierSeated => CurrentTable >= _ctx.Marks.CroupierFromTable;
+        /// <summary>
+        /// A Mark drags him up the tables; Croupier's Favour drags him further
+        /// still. Whichever wants him earliest wins.
+        /// </summary>
+        public bool IsCroupierSeated => CurrentTable >=
+            Mathf.Min(_ctx.Marks.CroupierFromTable, _ctx.Pledges.CroupierFromTable);
 
         public string SeatLine
         {

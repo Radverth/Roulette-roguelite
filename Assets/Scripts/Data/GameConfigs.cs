@@ -12,7 +12,6 @@ namespace SinWheel
     {
         Coins,
         Xp,
-        Gems,
         Buff,
         Humility,
         Damage,
@@ -205,6 +204,13 @@ namespace SinWheel
 
         // --- Near-miss: bias the resting angle toward the richest neighbour ---
         public float nearMissChance = 0.6f;
+
+        // --- The Nudge: a decision inside the spin, paid for in Notice ---
+        public int nudgeCostOne = 1;
+        public int nudgeCostTwo = 3;
+        public float nudgeWindowBase = 1.2f;
+        public float nudgeWindowPerTable = 0.1f;
+        public float nudgeWindowFloor = 0.6f;
     }
 
     /// <summary>Aggregated root handed to every system via GameContext.</summary>
@@ -217,5 +223,6 @@ namespace SinWheel
         public TablesConfig Tables;
         public MarksConfig Marks;
         public InterludesConfig Interludes;
+        public PledgesConfig Pledges;
     }
 }

@@ -13,6 +13,8 @@ namespace SinWheel
 
         public static Sprite Get(string path)
         {
+            // Callers legitimately pass null for "no art yet"; that is not an error.
+            if (string.IsNullOrEmpty(path)) return null;
             if (Cache.TryGetValue(path, out Sprite cached)) return cached;
 
             Sprite sprite = Resources.Load<Sprite>("Art/" + path);
@@ -33,7 +35,6 @@ namespace SinWheel
                 case SegmentType.Humility: return Get("Loop/break_pride");
                 case SegmentType.Coins: return Get("Icons/seg_coin");
                 case SegmentType.Xp: return Get("Icons/seg_xp");
-                case SegmentType.Gems: return Get("Icons/seg_shard");
                 case SegmentType.Buff: return Get("Icons/seg_buff");
                 case SegmentType.Damage: return Get("Icons/seg_damage");
                 case SegmentType.CoinLoss: return Get("Icons/seg_currency_loss");

@@ -6,9 +6,9 @@ and decide every spin whether to keep going or bank out. Sessions are designed
 for 2–4 minutes of "one more spin".
 
 **Status:** all seven sins implemented with break conditions, the Forge
-(wedge drafting), the seven-table descent, the seven Marks, and seven
-interlude mini-games. Every number lives in JSON under
-`Assets/Resources/Config/`.
+(wedge drafting), the seven-table descent, the seven Marks, seven interlude
+mini-games, the Nudge, twenty Pledges, and unified Take x Mult scoring. Every
+number lives in JSON under `Assets/Resources/Config/`.
 
 ## Core loop
 
@@ -18,6 +18,7 @@ different clocks (design docs: `Art/Loop/LOOP_DESIGN.md` and
 
 | Horizon | System | Decision |
 |---|---|---|
+| Inside a spin | **The Nudge** | pay Notice to push the settled wheel, or take it |
 | Per spin | **Streak** | protect the chain or chase the bigger wedge |
 | Per encounter | **Break conditions** | fight the sin or wait it out |
 | Per table | **The invite** | go deeper, or cash out and end the run |
@@ -28,20 +29,25 @@ different clocks (design docs: `Art/Loop/LOOP_DESIGN.md` and
    by weight, then the wheel eases onto it — visuals always match resolution,
    and the resting angle is biased toward the seam it shares with its richest
    neighbour, so the ticker often settles *just* past a jackpot.
-2. Reward wedges (coins, XP, blessings, shards, jackpot) vs risk wedges
+2. The wheel settles but nothing is paid yet: for about 1.2 seconds (less at
+   deeper tables) you may **nudge** it one wedge either way, priced in Notice —
+   1 segment for the first push, 3 for two. At full Notice you simply cannot,
+   which is what makes the top of that meter frightening. The roll was still
+   fair; the nudge changes the outcome after the fact, not the odds.
+3. Reward wedges (coins, XP, blessings, jackpot) vs risk wedges
    (wounds, coin loss, hexes, **sin summon**).
-3. **Streak**: three reward wedges in a row starts a chain, each further reward
+4. **Streak**: three reward wedges in a row starts a chain, each further reward
    adds +0.25x, any risk wedge wipes it. Capped at 3.0x.
-4. **Notice** is the escalation made visible: eight segments that fill with
+5. **Notice** is the escalation made visible: eight segments that fill with
    spins, tithes and a fat purse, with an eye that opens in four stages. At
    full, the next risk wedge guarantees a summon and the meter resets.
-5. **Tithe** converts half the purse without ending the run — safety now,
+6. **Tithe** converts half the purse without ending the run — safety now,
    bought with a segment of Notice. **Bank** takes it all and walks.
-6. Every run carries a **quota** drawn from the debt. Meet it and the debt
+7. Every run carries a **quota** drawn from the debt. Meet it and the debt
    falls and the quota eases; miss it and the debt grows, the quota compounds,
    and the house splices another risk wedge into your ring. Leaving early is
    not the safe option, it is a different risk.
-7. A run ends when resilience hits zero — unbanked coins forfeit — or when the
+8. A run ends when resilience hits zero — unbanked coins forfeit — or when the
    player banks out.
 
 ### How often do sins appear?
@@ -124,6 +130,59 @@ Rotation rules do the work: never the same one twice running, the full set
 before any repeat, never one whose sin is at the table, and skip is always
 available for a flat 40 coins — deliberately worse than an average play. Bands
 narrow, patterns lengthen and windows tighten with table depth.
+
+### Take x Mult
+
+Every multiplier in the game feeds one figure. The table, the streak, blessings,
+each active sin and every Pledge contribute a term to a single `ScoreBreakdown`,
+which assembles in front of the player chip by chip — brass for additions,
+violet for scaling, red for reductions — before the plate shows the total.
+
+```
+        TAKE  40   x   MULT  1.0
+   + Table III            x 1.7
+   + Streak X3            x 2.0
+   + Crown                x 1.4
+   - The Gaze             x 0.7
+   -------------------------------
+        TAKE  40   x   MULT  3.3   =   132
+```
+
+Additions resolve first, then every scaling factor applies to the result. Below
+two terms the assembly is noise, so the HUD falls back to the plain floating
+number. Four rows fit; a build that beats that gets its three loudest terms
+named and the remainder folded into one honest `OTHERS` chip, so the figures
+still multiply out to the plate.
+
+This is pure presentation — `ScorePanel` reads a resolved breakdown and changes
+nothing about it — but it is what makes the systems underneath legible.
+
+### Pledges
+
+Twenty things put up against the debt, five slots, always visible down the left
+of the wheel. The design rule is that **a Pledge changes a rule, never just a
+number** — that is what makes them combine rather than stack. Widow's Ring makes
+risk wedges pay coin instead of wounding, which rewrites what your Forge is for;
+Blood Price moves the nudge price from Notice onto resilience; Pauper's Luck
+pays you for the slots you leave empty.
+
+| Rarity | Pledges |
+|---|---|
+| Common | Widow's Ring, Long Coat, Sexton's Key, Pauper's Luck, The Tally |
+| Uncommon | Cracked Mirror, The Thumb, Ash Ledger, Iron Tithe, Understudy, Gravedigger's Cut |
+| Rare | Blind Wager, Seventh Hour, Debtor's Crown, Hollow Coin, The Long Game |
+| Cursed | Croupier's Favour, Blood Price, Open Ledger, Widow's Debt |
+
+Offered in the Forge alongside wedge cards, roughly one offer in three, and only
+while a slot is free and the pledge is not already held. Selling refunds half in
+relics so experimenting is not punished; **cursed Pledges cannot be sold**.
+Pledges persist across runs and are **reclaimed when a Mark is taken** — the
+house takes back what was pledged as the debt clears, which is what stops a
+permanent runaway build and gives ascension real teeth.
+
+Effects live at the call sites they change, not in a switch pretending to be
+data: `PledgeSystem` exposes one query per rule, and the system that owns that
+rule reads it. All twenty numbers are in `pledges.json`.
 
 ### The Forge
 
@@ -208,7 +267,10 @@ GameBootstrap (MonoBehaviour, scene entry)
      │    └─ BossModifierBase hooks: ModifySegments, ModifyCooldown,
      │       ModifyCoinGain, OnSpinStarted, OnSpinResolved, IsDefeated
      │       (SlothModifier implemented; factory maps the other six)
-     ├─ SpinSystem ────── state machine: Idle → Spinning → Resolving → Cooldown
+     ├─ SpinSystem ────── state machine: Idle → Spinning → Nudging →
+     │                    Resolving → Cooldown
+     ├─ NudgeSystem ───── the decision inside the spin, priced in Notice
+     ├─ PledgeSystem ──── five slots of rule changes, one query per rule
      ├─ WheelRingSystem ─ the ring is the build: persistent wedge slots with
      │                    temper tiers, warped per run by sin splices, Lust's
      │                    shuffles and unpaid-debt penalty wedges
@@ -229,9 +291,17 @@ GameBootstrap (MonoBehaviour, scene entry)
 
 ### Spin state machine
 
-`SpinSystem` owns `Idle → Spinning → Resolving → Cooldown → Idle`. The outcome
-is pre-rolled from segment weights; `WheelController` just eases the wheel onto
-the winning segment (ease-out cubic, per-segment ticks, land thunk + haptics).
+`SpinSystem` owns `Idle → Spinning → Nudging → Resolving → Cooldown → Idle`.
+The outcome is pre-rolled from segment weights; `WheelController` just eases the
+wheel onto the winning segment (ease-out cubic, per-segment ticks, land thunk +
+haptics).
+
+`Nudging` is the window between the wheel settling and anything being paid: the
+landing index can still move, ghosts outline the two destinations, and the SPIN
+button becomes TAKE so nobody has to wait out a decision they have made. Break
+conditions count nudged landings — nudging onto a Humility still breaks Pride,
+and the Notice it cost is the balance.
+
 Cooldown length passes through upgrades first, then the active sin's
 `ModifyCooldown` hook — which is how Sloth doubles it.
 
@@ -253,12 +323,16 @@ All tuning lives in `Assets/Resources/Config/`:
 | `wheel.json` | the wedge catalog (type, weight, amount, class, rarity, temper scale) and the starting ring |
 | `sins.json` | all seven sins: unlock level, duration, modifier params, break targets, payouts |
 | `upgrades.json` | meta tree (cooldown/HP/banking) + per-sin resistance trees |
+| `pledges.json` | twenty Pledges: rarity, the one tunable figure per rule, slots, offer rate, sell refund |
+| `tables.json` | the seven tables: thresholds, multipliers, Croupier seats |
+| `marks.json` | the seven Marks and what each permanently costs you |
+| `interludes.json` | the seven mini-games, their verbs and payouts |
 
 Rebalancing requires no code changes; segment types are the only enum contract.
 
 ### Save & progression
 
-`SaveData` (meta coins, gems, level/XP, upgrade tiers, records) persists as JSON
+`SaveData` (relics, level/XP, upgrade tiers, held Pledges, records) persists as JSON
 in `Application.persistentDataPath`, written at every commit point (bank, run
 end, purchase, level-up, app pause). `ICloudSaveProvider` is the Google Play
 Games Services seam — last-write-wins on timestamp; `GooglePlayCloudSaveProvider`

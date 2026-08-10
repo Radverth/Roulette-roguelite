@@ -53,7 +53,7 @@ namespace SinWheel
         {
             var t = _ctx.Config.Tuning;
             // Table III onward, the house watches faster.
-            float rate = _ctx.Tables.NoticeRateMultiplier;
+            float rate = _ctx.Tables.NoticeRateMultiplier * _ctx.Pledges.NoticeRateMultiplier;
             Add(t.noticePerSpin * rate);
             if (runPurse >= t.noticeHighPurseThreshold)
                 Add(t.noticeHighPurseBonus * rate);

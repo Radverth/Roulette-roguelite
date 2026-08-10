@@ -1,0 +1,32 @@
+{
+  "_note": "Twenty things put up against the debt. The rule: a Pledge changes a rule, never just a number - that is what makes them combine rather than stack. 'value' is the tunable figure for whichever rule the pledge rewrites; the behaviour itself is keyed by id in PledgeSystem.",
+  "slots": 5,
+  "offerRate": 0.33,
+  "sellRefundPercent": 50,
+  "lostOnMark": true,
+  "pledges": [
+    { "id": "widows_ring", "name": "WIDOWS RING", "rarity": "common", "value": 50, "description": "RISK WEDGES PAY COIN AT HALF VALUE INSTEAD OF WOUNDING" },
+    { "id": "long_coat", "name": "LONG COAT", "rarity": "common", "value": 1, "description": "NUDGES COST 1 LESS NOTICE, MINIMUM 1" },
+    { "id": "sextons_key", "name": "SEXTONS KEY", "rarity": "common", "value": 3, "description": "BREAKING A SIN REFUNDS 3 NOTICE" },
+    { "id": "paupers_luck", "name": "PAUPERS LUCK", "rarity": "common", "value": 1, "description": "+1 MULT FOR EVERY EMPTY PLEDGE SLOT" },
+    { "id": "the_tally", "name": "THE TALLY", "rarity": "common", "value": 7, "description": "EVERY 7TH SPIN IS A GUARANTEED REWARD" },
+
+    { "id": "cracked_mirror", "name": "CRACKED MIRROR", "rarity": "uncommon", "value": 2, "description": "PRIDE NEVER COMES. EVERY OTHER SIN LASTS 2 SPINS LONGER" },
+    { "id": "the_thumb", "name": "THE THUMB", "rarity": "uncommon", "value": 40, "description": "NUDGE TWO FOR THE PRICE OF ONE. THE HOUSE PICKS 40% OF THE TIME" },
+    { "id": "ash_ledger", "name": "ASH LEDGER", "rarity": "uncommon", "value": 2, "description": "BANKING GRANTS +2 MULT ON YOUR NEXT RUN, ONCE" },
+    { "id": "iron_tithe", "name": "IRON TITHE", "rarity": "uncommon", "value": 30, "description": "TITHING COSTS NO NOTICE BUT CAPS AT 30% OF THE PURSE" },
+    { "id": "understudy", "name": "UNDERSTUDY", "rarity": "uncommon", "value": 1, "description": "KEEP THE BREAK REWARD OF THE LAST SIN YOU BROKE" },
+    { "id": "gravediggers_cut", "name": "GRAVEDIGGERS CUT", "rarity": "uncommon", "value": 0.5, "description": "+0.5 MULT FOR EVERY WEDGE YOU HAVE STRUCK, FOREVER" },
+
+    { "id": "blind_wager", "name": "BLIND WAGER", "rarity": "rare", "value": 1.5, "description": "THE WHEEL IS HIDDEN WHILE IT SPINS. ALL REWARDS X1.5" },
+    { "id": "seventh_hour", "name": "SEVENTH HOUR", "rarity": "rare", "value": 7, "description": "AT TABLE 7, NO SIN CAN COME" },
+    { "id": "debtors_crown", "name": "DEBTORS CROWN", "rarity": "rare", "value": 1, "description": "+1 MULT FOR EVERY MARK TAKEN" },
+    { "id": "hollow_coin", "name": "HOLLOW COIN", "rarity": "rare", "value": 1, "description": "THE JACKPOT APPEARS TWICE IN THE RING" },
+    { "id": "the_long_game", "name": "THE LONG GAME", "rarity": "rare", "value": 0.2, "description": "+0.2 MULT EACH SPIN. BANKING RESETS IT TO NOTHING" },
+
+    { "id": "croupiers_favour", "name": "CROUPIERS FAVOUR", "rarity": "cursed", "value": 3, "description": "+3 MULT, BUT HE SITS FROM TABLE 3" },
+    { "id": "blood_price", "name": "BLOOD PRICE", "rarity": "cursed", "value": 8, "description": "NUDGES COST RESILIENCE INSTEAD OF NOTICE" },
+    { "id": "open_ledger", "name": "OPEN LEDGER", "rarity": "cursed", "value": 2, "description": "SEE THE NEXT WEDGE. THE EYE FILLS TWICE AS FAST" },
+    { "id": "widows_debt", "name": "WIDOWS DEBT", "rarity": "cursed", "value": 2, "description": "X2 MULT, BUT BUSTING DOUBLES YOUR DEBT" }
+  ]
+}

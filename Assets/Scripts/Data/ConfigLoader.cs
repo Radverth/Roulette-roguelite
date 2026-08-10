@@ -19,7 +19,8 @@ namespace SinWheel
                 Upgrades = Load<UpgradesConfig>("Config/upgrades"),
                 Tables = Load<TablesConfig>("Config/tables"),
                 Marks = Load<MarksConfig>("Config/marks"),
-                Interludes = Load<InterludesConfig>("Config/interludes")
+                Interludes = Load<InterludesConfig>("Config/interludes"),
+                Pledges = Load<PledgesConfig>("Config/pledges")
             };
         }
 

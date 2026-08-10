@@ -39,6 +39,8 @@ namespace SinWheel
             _ctx.Marks = new MarkSystem(_ctx);
             _ctx.Tables = new TableSystem(_ctx);
             _ctx.Interludes = new InterludeSystem(_ctx);
+            _ctx.Pledges = new PledgeSystem(_ctx);
+            _ctx.Nudge = new NudgeSystem(_ctx);
             _ctx.Ring = new WheelRingSystem(_ctx);
             _ctx.Notice = new NoticeSystem(_ctx);
             _ctx.Streak = new StreakSystem(_ctx);
