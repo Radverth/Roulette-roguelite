@@ -75,16 +75,26 @@ namespace SinWheel
             if (taken <= 0) return 0;
 
             RunCoins -= taken;
-            int banked = Mathf.RoundToInt(taken * Mathf.Max(1f, bankingBonusMultiplier));
+            int banked = ApplyHouseCut(Mathf.RoundToInt(taken * Mathf.Max(1f, bankingBonusMultiplier)));
             _ctx.Save.Data.metaCoins += banked;
             _ctx.Save.Data.totalBanked += banked;
             return banked;
         }
 
+        /// <summary>At his table the Croupier takes a fifth of everything you bank.</summary>
+        private int ApplyHouseCut(int amount)
+        {
+            float percent = _ctx.Tables?.BankTaxPercent ?? 0f;
+            if (percent <= 0f) return amount;
+            int cut = Mathf.RoundToInt(amount * percent / 100f);
+            if (cut > 0) _ctx.Hud?.Toast($"THE HOUSE TAKES {cut}", Palette.Blood);
+            return Mathf.Max(0, amount - cut);
+        }
+
         /// <summary>Moves run coins into the persistent bank. Returns amount banked (with bonus).</summary>
         public int BankRunCoins(float bankingBonusMultiplier)
         {
-            int banked = Mathf.RoundToInt(RunCoins * Mathf.Max(1f, bankingBonusMultiplier));
+            int banked = ApplyHouseCut(Mathf.RoundToInt(RunCoins * Mathf.Max(1f, bankingBonusMultiplier)));
             _ctx.Save.Data.metaCoins += banked;
             _ctx.Save.Data.totalBanked += banked;
             RunCoins = 0;

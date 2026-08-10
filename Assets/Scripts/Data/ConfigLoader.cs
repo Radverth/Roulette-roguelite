@@ -16,7 +16,10 @@ namespace SinWheel
                 Tuning = Load<GameTuningConfig>("Config/tuning"),
                 Wheel = Load<WheelConfig>("Config/wheel"),
                 Sins = Load<SinsConfig>("Config/sins"),
-                Upgrades = Load<UpgradesConfig>("Config/upgrades")
+                Upgrades = Load<UpgradesConfig>("Config/upgrades"),
+                Tables = Load<TablesConfig>("Config/tables"),
+                Marks = Load<MarksConfig>("Config/marks"),
+                Interludes = Load<InterludesConfig>("Config/interludes")
             };
         }
 

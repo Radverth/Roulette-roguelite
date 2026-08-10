@@ -39,7 +39,8 @@ namespace SinWheel
 
         public void ResetForRun()
         {
-            Value = 0f;
+            // Mark IV: the eye is already part open when you sit down.
+            Value = Segments * _ctx.Marks.NoticeStartFraction;
         }
 
         public void Add(float amount)
@@ -51,12 +52,15 @@ namespace SinWheel
         public void OnSpin(int runPurse)
         {
             var t = _ctx.Config.Tuning;
-            Add(t.noticePerSpin);
+            // Table III onward, the house watches faster.
+            float rate = _ctx.Tables.NoticeRateMultiplier;
+            Add(t.noticePerSpin * rate);
             if (runPurse >= t.noticeHighPurseThreshold)
-                Add(t.noticeHighPurseBonus);
+                Add(t.noticeHighPurseBonus * rate);
         }
 
-        public void OnTithe() => Add(_ctx.Config.Tuning.noticePerTithe);
+        /// <summary>Mark V: paying draws twice the attention.</summary>
+        public void OnTithe() => Add(_ctx.Config.Tuning.noticePerTithe * _ctx.Marks.TitheNoticeMultiplier);
         public void OnHumility() => Add(_ctx.Config.Tuning.noticeOnHumility);
         public void OnSinBroken() => Add(_ctx.Config.Tuning.noticeOnSinBroken);
         public void OnEncounterEnded() => Add(_ctx.Config.Tuning.noticeOnEncounterEnd);

@@ -32,6 +32,12 @@ namespace SinWheel
         public DebtSystem Debt;
         public ForgeSystem Forge;
 
+        // Escalation: the descent within a run, the Marks across them, and the
+        // mini-games that sit on the beats between.
+        public TableSystem Tables;
+        public MarkSystem Marks;
+        public InterludeSystem Interludes;
+
         public SinBossSystem Bosses;
         public SpinSystem Spin;
         public GameManager Game;

@@ -5,21 +5,24 @@ Spin a 12-segment roulette wheel, push your luck against the Seven Deadly Sins,
 and decide every spin whether to keep going or bank out. Sessions are designed
 for 2–4 minutes of "one more spin".
 
-**Vertical slice status:** core loop + progression + one sin boss (**Sloth**)
-playable end-to-end. The other six sins ship as balance config with a modifier
-seam waiting for their implementations.
+**Status:** all seven sins implemented with break conditions, the Forge
+(wedge drafting), the seven-table descent, the seven Marks, and seven
+interlude mini-games. Every number lives in JSON under
+`Assets/Resources/Config/`.
 
 ## Core loop
 
-The wheel is a debt being serviced, and the loop puts a decision on four
-different clocks (design: `Assets/Resources/Art/Loop/LOOP_DESIGN.md`):
+The wheel is a debt being serviced, and the loop puts a decision on five
+different clocks (design docs: `Art/Loop/LOOP_DESIGN.md` and
+`Art/Escalation/ESCALATION_DESIGN.md`):
 
 | Horizon | System | Decision |
 |---|---|---|
 | Per spin | **Streak** | protect the chain or chase the bigger wedge |
 | Per encounter | **Break conditions** | fight the sin or wait it out |
+| Per table | **The invite** | go deeper, or cash out and end the run |
 | Per run | **Quota + Notice** | when to leave, and how much to leave with |
-| Between runs | **The Forge** | what kind of wheel you are building |
+| Between runs | **The Forge + Marks** | what wheel you build, and how hard it gets |
 
 1. Tap **SPIN** (1.5s cooldown, upgrade-reducible). The landing wedge is rolled
    by weight, then the wheel eases onto it — visuals always match resolution,
@@ -64,6 +67,63 @@ quota, the tithe, the seven and the Forge. It runs automatically before a
 player's first spin and is available afterwards from **HOW TO PLAY** on the
 menu. The copy is in `Assets/Resources/Config/tutorial.json` — keep body lines
 to 24 characters and titles to 12, or they overflow the plate.
+
+### The descent: seven tables
+
+A run is not a flat sequence of spins. Cross a coin threshold and the house
+**invites you deeper**: accept and the stakes multiply along with the danger,
+decline and you are cashing out — the run ends there. The fork recurs six times.
+
+| Table | Adds | Reward x |
+|---|---|---|
+| I | baseline | 1.0 |
+| II | one extra risk wedge | 1.3 |
+| III | Notice fills 25% faster | 1.7 |
+| IV | **sins stack** — two at once | 2.2 |
+| V | resilience no longer restores | 2.8 |
+| VI | a cursed wedge each table | 3.5 |
+| VII | **the Croupier sits down** | 5.0 |
+
+Advancement is tied to winnings, not spin count, so a cautious player and a
+greedy one see different amounts of the game. At his table the Croupier takes
+one trick for the run, rotating: he calls the wedge before you spin, or taxes
+every bank a fifth, or disables break conditions, or withholds the result until
+you commit to another spin.
+
+`thresholdBase` was simulated rather than guessed — the doc is right that it is
+the most important number here. At **340 with 1.40 growth**, a player who takes
+every invite ends: 19% Table II, 17% III, 17% IV, 34% V, 11% VI, 1% VII. Most
+runs finish at IV or V and reaching VII stays a story worth telling; cashing out
+at even a quarter of invites pulls the whole curve back to II–III.
+
+### Marks: the ramp across runs
+
+Every 1200 of debt cleared takes a Mark, in order, permanently: the quota rises
+20%, a wound joins the ring at run start, sins last four more spins, Notice
+begins a quarter full, tithes cost two segments, every counted break condition
+wants one more, and finally the Croupier sits from Table V instead of VII.
+Difficulty is never picked from a menu — it arrives as a consequence of paying.
+
+### Interludes: seven mini-games
+
+Two are offered at each table transition, and once mid-run when Notice passes
+75% (the **Side Table**, where winning closes the eye by three segments). One
+verb each, ten seconds maximum, one thumb, and failure never ends a run:
+
+| Interlude | Sin | Verb | Win | Lose |
+|---|---|---|---|---|
+| The Ember | Wrath | stop the needle in the band | coin by accuracy | take a wound |
+| The Mirror | Pride | reproduce the pattern | temper a wedge free | nothing |
+| The Shell | Lust | follow the coin | next spin is a reward | Notice +1 |
+| The Feast | Gluttony | hold to take, stop in time | escalating coin | lose 25% of the purse |
+| The Toll | Greed | five taps on the beat | coin by accuracy | nothing |
+| The Vigil | Sloth | release inside the window | cooldown down for the table | Notice +1 |
+| The Understudy | Envy | find the flaw | see the next three spins | Notice +1 |
+
+Rotation rules do the work: never the same one twice running, the full set
+before any repeat, never one whose sin is at the table, and skip is always
+available for a flat 40 coins — deliberately worse than an average play. Bands
+narrow, patterns lengthen and windows tighten with table depth.
 
 ### The Forge
 
@@ -156,6 +216,12 @@ GameBootstrap (MonoBehaviour, scene entry)
      ├─ StreakSystem ──── the per-spin chain and its multiplier
      ├─ DebtSystem ────── quota, debt, tithe accounting
      ├─ ForgeSystem ───── weighted draft offers between runs
+     ├─ TableSystem ───── the descent: invites, per-table effects, the
+     │                    Croupier's seat at the deepest table
+     ├─ MarkSystem ────── seven permanent difficulty steps bought by debt
+     ├─ InterludeSystem ─ mini-game rotation, offers and payouts
+     │    └─ InterludeGame: Ember, Mirror, Shell, Feast, Toll, Vigil,
+     │       Understudy — one verb each, hosted by InterludeScreen
      ├─ GameManager ───── run lifecycle: start, tithe, death, bank-out, settle
      └─ HudController ─── UGUI built at runtime + WheelController + ForgeScreen
                           (runtime-rasterised disc, eased spin, juice)

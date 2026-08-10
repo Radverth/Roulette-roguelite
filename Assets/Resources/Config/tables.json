@@ -1,0 +1,15 @@
+{
+  "_note": "The descent. Each table states its absolute effects, not a delta, so a designer can read the state of play at a glance. Advancement is by coins earned, not spins - the house moves you inward because you are winning.",
+  "thresholdBase": 340,
+  "thresholdGrowth": 1.40,
+  "croupierTable": 7,
+  "tables": [
+    { "index": 1, "name": "THE FLOOR", "rewardMultiplier": 1.0, "extraRiskWedges": 0, "noticeRateMultiplier": 1.0, "maxActiveSins": 1, "restoresResilience": true, "cursedWedgePerTable": false, "croupierSeated": false, "blurb": "BASELINE" },
+    { "index": 2, "name": "THE STEP", "rewardMultiplier": 1.3, "extraRiskWedges": 1, "noticeRateMultiplier": 1.0, "maxActiveSins": 1, "restoresResilience": true, "cursedWedgePerTable": false, "croupierSeated": false, "blurb": "ONE MORE WOUND" },
+    { "index": 3, "name": "THE WATCH", "rewardMultiplier": 1.7, "extraRiskWedges": 1, "noticeRateMultiplier": 1.25, "maxActiveSins": 1, "restoresResilience": true, "cursedWedgePerTable": false, "croupierSeated": false, "blurb": "THE EYE OPENS FASTER" },
+    { "index": 4, "name": "THE CHOIR", "rewardMultiplier": 2.2, "extraRiskWedges": 1, "noticeRateMultiplier": 1.25, "maxActiveSins": 2, "restoresResilience": true, "cursedWedgePerTable": false, "croupierSeated": false, "blurb": "SINS COME IN PAIRS" },
+    { "index": 5, "name": "THE MARROW", "rewardMultiplier": 2.8, "extraRiskWedges": 1, "noticeRateMultiplier": 1.25, "maxActiveSins": 2, "restoresResilience": false, "cursedWedgePerTable": false, "croupierSeated": false, "blurb": "NO MORE MENDING" },
+    { "index": 6, "name": "THE OFFERING", "rewardMultiplier": 3.5, "extraRiskWedges": 1, "noticeRateMultiplier": 1.25, "maxActiveSins": 2, "restoresResilience": false, "cursedWedgePerTable": true, "croupierSeated": false, "blurb": "A CURSED WEDGE EACH TABLE" },
+    { "index": 7, "name": "THE SEAT", "rewardMultiplier": 5.0, "extraRiskWedges": 1, "noticeRateMultiplier": 1.25, "maxActiveSins": 2, "restoresResilience": false, "cursedWedgePerTable": true, "croupierSeated": true, "blurb": "THE CROUPIER SITS DOWN" }
+  ]
+}

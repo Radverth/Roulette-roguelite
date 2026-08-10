@@ -66,6 +66,7 @@ namespace SinWheel
         private GameObject _menuPanel;
         private PixelText _menuFragments;
         private PixelText _menuDebt;
+        private readonly List<Image> _markSeals = new List<Image>();
 
         private GameObject _runEndPanel;
         private Image _runEndIntertitle;
@@ -78,8 +79,16 @@ namespace SinWheel
         private GameObject _upgradesPanel;
         private RectTransform _upgradesContent;
 
+        private readonly List<Image> _depthPips = new List<Image>();
+        private PixelText _tableLabel;
+        private PixelText _tableMultiplier;
+        private Image _bossSigilSecond;
+        private RectTransform _foresightRow;
+
         private ForgeScreen _forge;
         private TutorialScreen _tutorial;
+        private TableInviteScreen _tableInvite;
+        private InterludeScreen _interlude;
         private Coroutine _shakeRoutine;
 
         public HudController(GameContext ctx)
@@ -126,6 +135,8 @@ namespace SinWheel
 
             _forge = new ForgeScreen(_ctx, _root, () => _ctx.Game.StartRun());
             _tutorial = new TutorialScreen(_ctx, _root, OnTutorialClosed);
+            _tableInvite = new TableInviteScreen(_ctx, _root, OnTableAccepted);
+            _interlude = new InterludeScreen(_ctx, _root, null);
         }
 
         /// <summary>
@@ -156,8 +167,21 @@ namespace SinWheel
 
         private void BuildTopBar()
         {
-            var title = PixelText.Create(_shakeRoot, "Title", "SIN WHEEL", Palette.Gold);
-            UiFactory.Place((RectTransform)title.transform, Top, new Vector2(0f, -8f), Vector2.zero);
+            // The descent track replaces the title during a run: where you are,
+            // how deep it goes, and what it is paying.
+            _tableLabel = PixelText.Create(_shakeRoot, "TableLabel", "T I", Palette.Gold, 1, PxAlign.Left);
+            UiFactory.Place((RectTransform)_tableLabel.transform, Top, new Vector2(-86f, -8f), Vector2.zero);
+
+            for (int i = 0; i < 7; i++)
+            {
+                var pip = UiFactory.CreateSpriteImage(_shakeRoot, $"DepthPip_{i}", "Escalation/depth_pip_locked",
+                    new Vector2(10f, 10f));
+                UiFactory.Place((RectTransform)pip.transform, Top, new Vector2(-20f + i * 10f, -8f), new Vector2(10f, 10f));
+                _depthPips.Add(pip);
+            }
+
+            _tableMultiplier = PixelText.Create(_shakeRoot, "TableMult", "", Palette.Bone, 1, PxAlign.Right);
+            UiFactory.Place((RectTransform)_tableMultiplier.transform, Top, new Vector2(86f, -8f), Vector2.zero);
 
             var hpIcon = UiFactory.CreateSpriteImage(_shakeRoot, "HpIcon", "Icons/ui_hp", new Vector2(16f, 16f));
             UiFactory.Place((RectTransform)hpIcon.transform, Top, new Vector2(-80f, -22f), new Vector2(16f, 16f));
@@ -245,6 +269,11 @@ namespace SinWheel
             _bossSigil = UiFactory.CreateSpriteImage(strip.transform, "Sigil", null, new Vector2(24f, 24f));
             UiFactory.Place((RectTransform)_bossSigil.transform, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(24f, 24f));
 
+            // From Table IV they come in pairs, so the strip carries two marks.
+            _bossSigilSecond = UiFactory.CreateSpriteImage(strip.transform, "SigilTwo", null, new Vector2(16f, 16f));
+            UiFactory.Place((RectTransform)_bossSigilSecond.transform, new Vector2(0f, 0.5f), new Vector2(34f, -8f), new Vector2(16f, 16f));
+            _bossSigilSecond.gameObject.SetActive(false);
+
             _bossName = PixelText.Create(strip.transform, "Name", "", Palette.Gold, 1, PxAlign.Left);
             UiFactory.Place((RectTransform)_bossName.transform, new Vector2(0f, 0.5f), new Vector2(34f, 7f), Vector2.zero);
 
@@ -270,6 +299,12 @@ namespace SinWheel
 
             _statusLine = PixelText.Create(_shakeRoot, "StatusLine", "", Palette.Bone);
             UiFactory.Place((RectTransform)_statusLine.transform, Top, new Vector2(0f, -266f), Vector2.zero);
+
+            // The Understudy's winnings: the next three wedges, already rolled,
+            // in the gap between the sin strip and the rim.
+            _foresightRow = UiFactory.CreateRect(_shakeRoot, "Foresight");
+            UiFactory.Place(_foresightRow, Top, new Vector2(0f, -127f), new Vector2(48f, 12f));
+            _foresightRow.gameObject.SetActive(false);
         }
 
         private void BuildBottomBar()
@@ -351,12 +386,23 @@ namespace SinWheel
             UiFactory.Place((RectTransform)howTo.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -56f), new Vector2(96f, 32f));
 
             _menuDebt = PixelText.Create(frame, "Debt", "", Palette.Bone);
-            UiFactory.Place((RectTransform)_menuDebt.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -84f), Vector2.zero);
+            UiFactory.Place((RectTransform)_menuDebt.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -80f), Vector2.zero);
+
+            // Seven sockets. What the house has taken back for letting you pay.
+            var markTrack = UiFactory.CreateSpriteImage(frame, "MarkTrack", "Escalation/mark_track", new Vector2(104f, 16f));
+            UiFactory.Place((RectTransform)markTrack.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -94f), new Vector2(104f, 16f));
+            for (int i = 1; i <= 7; i++)
+            {
+                var seal = UiFactory.CreateSpriteImage(markTrack.transform, $"Mark_{i}", null, new Vector2(12f, 12f));
+                UiFactory.Place((RectTransform)seal.transform, new Vector2(0.5f, 0.5f),
+                    new Vector2(-42f + (i - 1) * 14f, 0f), new Vector2(12f, 12f));
+                _markSeals.Add(seal);
+            }
 
             var musicLabel = PixelText.Create(frame, "MusicLabel", "MUSIC", Palette.Bone, 1, PxAlign.Left);
-            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -104f), Vector2.zero);
+            UiFactory.Place((RectTransform)musicLabel.transform, new Vector2(0.5f, 0.5f), new Vector2(-82f, -112f), Vector2.zero);
 
-            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -104f),
+            UiFactory.CreatePixelSlider(frame, "MusicSlider", new Vector2(0.5f, 0.5f), new Vector2(14f, -112f),
                 _ctx.Save.Data.musicVolume, v =>
                 {
                     Music.SetVolume(v);
@@ -364,7 +410,7 @@ namespace SinWheel
                 });
 
             _menuFragments = PixelText.Create(frame, "Fragments", "", Palette.Dim);
-            UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -126f), Vector2.zero);
+            UiFactory.Place((RectTransform)_menuFragments.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -130f), Vector2.zero);
 
             _menuPanel.SetActive(false);
         }
@@ -389,6 +435,12 @@ namespace SinWheel
         {
             _menuFragments.Text = $"FRAGMENTS {_ctx.Narrative.FragmentCount}/{NarrativeSystem.TotalFragments}";
             _menuDebt.Text = $"DEBT {_ctx.Debt.Debt} - QUOTA {_ctx.Debt.Quota}";
+            for (int i = 0; i < _markSeals.Count; i++)
+            {
+                int mark = i + 1;
+                _markSeals[i].sprite = ArtSprites.Get(
+                    _ctx.Marks.IsEarned(mark) ? $"Escalation/mark_{mark}_earned" : $"Escalation/mark_{mark}_locked");
+            }
             HideVoice();
             _runEndPanel.SetActive(false);
             _menuPanel.SetActive(true);
@@ -534,9 +586,22 @@ namespace SinWheel
 
         // --- Per-frame refresh ---
 
+        /// <summary>The fork: deeper, or cash out and end the run.</summary>
+        public void ShowTableInvite() => _tableInvite.Open();
+
+        /// <summary>An interlude sits on the beat after a decision, never at random.</summary>
+        public void ShowInterlude(bool sideTable) => _interlude.Open(sideTable);
+
+        private void OnTableAccepted()
+        {
+            // The transition is the natural breath point for a mini-game.
+            _interlude.Open(sideTable: false);
+        }
+
         public void Tick()
         {
             Wheel.SyncToRing();
+            _interlude.Tick(Time.deltaTime);
 
             var hp = _ctx.Health;
             _hpText.Text = $"{Mathf.CeilToInt(hp.CurrentHp)}/{hp.MaxHp}";
@@ -548,9 +613,11 @@ namespace SinWheel
             _levelText.Text = $"LV {_ctx.Xp.Level}";
             UiFactory.SetPixelBarFill(_xpFill, (float)_ctx.Xp.Xp / Mathf.Max(1, _ctx.Xp.XpToNextLevel()));
 
+            RefreshDescent();
             RefreshNotice();
             RefreshStreak();
             RefreshQuota();
+            RefreshForesight();
             RefreshStatusLine();
             RefreshSpinButton();
 
@@ -558,6 +625,43 @@ namespace SinWheel
                 && _ctx.Spin.State != SpinState.Spinning
                 && _ctx.Wallet.RunCoins > 0;
             _titheButton.interactable = _ctx.Game.CanTithe;
+        }
+
+        private void RefreshDescent()
+        {
+            int table = _ctx.Tables.CurrentTable;
+            _tableLabel.Text = $"T {TableInviteScreen.Roman(table)}";
+            _tableMultiplier.Text = $"X{_ctx.Tables.RewardMultiplier:0.0}";
+
+            for (int i = 0; i < _depthPips.Count; i++)
+            {
+                string sprite = i + 1 < table ? "Escalation/depth_pip_passed"
+                    : (i + 1 == table ? "Escalation/depth_pip_current" : "Escalation/depth_pip_locked");
+                _depthPips[i].sprite = ArtSprites.Get(sprite);
+            }
+
+        }
+
+        private void RefreshForesight()
+        {
+            var foreseen = _ctx.Run.ForeseenWedges;
+            bool show = foreseen.Count > 0;
+            if (_foresightRow.gameObject.activeSelf != show)
+                _foresightRow.gameObject.SetActive(show);
+            if (!show || _foresightRow.childCount == foreseen.Count) return;
+
+            for (int i = _foresightRow.childCount - 1; i >= 0; i--)
+                Object.Destroy(_foresightRow.GetChild(i).gameObject);
+
+            for (int i = 0; i < foreseen.Count; i++)
+            {
+                var template = _ctx.Ring.Template(foreseen[i]);
+                if (template == null) continue;
+                var icon = UiFactory.CreateSpriteImage(_foresightRow, $"Foreseen_{i}", null, new Vector2(12f, 12f));
+                icon.sprite = ArtSprites.IconForSegment(template);
+                UiFactory.Place((RectTransform)icon.transform, new Vector2(0.5f, 0.5f),
+                    new Vector2(-14f + i * 14f, 0f), new Vector2(12f, 12f));
+            }
         }
 
         private void RefreshNotice()
@@ -610,7 +714,8 @@ namespace SinWheel
             string line = "";
             if (buffs > 0) line += $"BLESS X{buffs} ";
             if (debuffs > 0) line += $"HEX X{debuffs} ";
-            if (_ctx.Bosses.EncounterActive) line += $"SIN X{_ctx.Bosses.CurrentRewardMultiplier:0.0}";
+            if (_ctx.Bosses.EncounterActive) line += $"SIN X{_ctx.Bosses.CurrentRewardMultiplier:0.0} ";
+            if (_ctx.Tables.IsCroupierSeated) line += _ctx.Tables.SeatLabel;
             _statusLine.Text = line.TrimEnd();
         }
 
@@ -749,17 +854,45 @@ namespace SinWheel
 
         public void OnBossStarted(BossEncounter encounter)
         {
+            if (encounter == null) return;
+
             _bossStrip.SetActive(true);
-            _bossSigil.sprite = ArtSprites.SigilFor(encounter.Config.id);
-            _bossName.Text = encounter.Config.displayName;
-            _bossBreakGlyph.sprite = ArtSprites.Get($"Loop/break_{encounter.Config.id}");
-            OnBossUpdated(encounter);
+            var primary = _ctx.Bosses.Primary ?? encounter;
+            _bossSigil.sprite = ArtSprites.SigilFor(primary.Config.id);
+            _bossBreakGlyph.sprite = ArtSprites.Get($"Loop/break_{primary.Config.id}");
+            RefreshBossNames();
+            OnBossUpdated(primary);
             ShowArrivalPlate(encounter.Config.id);
             Shake();
         }
 
+        /// <summary>The strip re-reads a new primary without replaying its arrival.</summary>
+        public void OnBossRefreshed(BossEncounter encounter)
+        {
+            if (encounter == null) return;
+            _bossSigil.sprite = ArtSprites.SigilFor(encounter.Config.id);
+            _bossBreakGlyph.sprite = ArtSprites.Get($"Loop/break_{encounter.Config.id}");
+            OnBossUpdated(encounter);
+        }
+
+        private void RefreshBossNames()
+        {
+            var active = _ctx.Bosses.Encounters;
+            if (active.Count == 0) return;
+
+            _bossName.Text = active.Count > 1
+                ? $"{active[0].Config.displayName}+{active[1].Config.displayName}"
+                : active[0].Config.displayName;
+
+            bool stacked = active.Count > 1;
+            _bossSigilSecond.gameObject.SetActive(stacked);
+            if (stacked) _bossSigilSecond.sprite = ArtSprites.SigilFor(active[1].Config.id);
+        }
+
         public void OnBossUpdated(BossEncounter encounter)
         {
+            if (encounter == null) return;
+            RefreshBossNames();
             _bossStatus.Text = encounter.Modifier.StatusText(encounter);
             _bossSpinsLeft.Text = $"{encounter.SpinsRemaining} LEFT";
         }
@@ -767,6 +900,7 @@ namespace SinWheel
         public void OnBossEnded()
         {
             _bossStrip.SetActive(false);
+            _bossSigilSecond.gameObject.SetActive(false);
         }
 
         public void ShowRunEnd(bool banked, int bankedAmount, int spins, DebtOutcome outcome)
@@ -792,11 +926,16 @@ namespace SinWheel
 
                 var data = _ctx.Save.Data;
                 string verdict = data.lastRunMetQuota ? "QUOTA MET - DEBT FALLS" : "QUOTA MISSED - DEBT RISES";
+                string marks = "";
+                foreach (var mark in _ctx.Game.LastMarksEarned)
+                    marks += $"\nMARK {TableInviteScreen.Roman(mark.index)} - {mark.name}";
+
                 _runEndStats.Text =
                     $"PAID {data.lastRunPaid} OF {data.lastRunQuota}" +
                     $"\n{verdict}" +
                     $"\nDEBT {_ctx.Debt.Debt}" +
-                    $"\nSPINS {spins} - LV {_ctx.Xp.Level}";
+                    $"\nREACHED TABLE {TableInviteScreen.Roman(_ctx.Tables.CurrentTable)}" +
+                    $"\nSPINS {spins} - LV {_ctx.Xp.Level}" + marks;
             }
         }
 

@@ -1,0 +1,13 @@
+{
+  "_note": "Ascension. Marks are taken in order as the debt clears, never chosen from a menu, and never reversible. Each is a permanent modifier on all future runs.",
+  "debtIntervalPerMark": 1200,
+  "marks": [
+    { "index": 1, "name": "THE LEDGER", "description": "QUOTA +20%", "quotaPercent": 20 },
+    { "index": 2, "name": "THE EXTRA WEDGE", "description": "A WOUND AT RUN START", "extraRiskWedges": 1 },
+    { "index": 3, "name": "THE LONG HOUR", "description": "SINS LAST 4 MORE SPINS", "sinDurationBonus": 4 },
+    { "index": 4, "name": "THE OPEN EYE", "description": "NOTICE BEGINS AT 25%", "noticeStartPercent": 25 },
+    { "index": 5, "name": "THE DOUBLED TITHE", "description": "A TITHE COSTS 2 SEGMENTS", "titheNoticeMultiplier": 2 },
+    { "index": 6, "name": "THE TIGHTER CHAIN", "description": "BREAKS NEED ONE MORE", "breakTargetBonus": 1 },
+    { "index": 7, "name": "THE SEAT", "description": "HE SITS FROM TABLE 5", "croupierFromTable": 5 }
+  ]
+}

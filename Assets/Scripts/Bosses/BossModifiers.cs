@@ -78,6 +78,11 @@ namespace SinWheel
 
         protected float ResistUpgrade => Ctx.Upgrades.SinResistValue(Cfg.id);
 
+        /// <summary>Mark VI: every counted break condition wants one more.</summary>
+        protected int BreakTarget => Cfg.breakTarget + Ctx.Marks.BreakTargetBonus;
+
+        protected int ResistTarget => Cfg.resistThreshold + Ctx.Marks.BreakTargetBonus;
+
         protected static List<SegmentConfig> Splice(List<SegmentConfig> ring, SegmentConfig wedge, int count)
         {
             if (wedge == null || count <= 0) return ring;
@@ -115,7 +120,7 @@ namespace SinWheel
                 return;
             }
             encounter.Resist++;
-            if (Cfg.resistThreshold > 0 && encounter.Resist >= Cfg.resistThreshold)
+            if (ResistTarget > 0 && encounter.Resist >= ResistTarget)
                 encounter.Broken = true;
         }
 
@@ -125,7 +130,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"RESIST {encounter.Resist}/{Cfg.resistThreshold}";
+            $"RESIST {encounter.Resist}/{ResistTarget}";
     }
 
     /// <summary>
@@ -178,7 +183,7 @@ namespace SinWheel
             if (landed.ParsedType == SegmentType.Humility)
             {
                 encounter.BreakProgress++;
-                if (encounter.BreakProgress >= Cfg.breakTarget) encounter.Broken = true;
+                if (encounter.BreakProgress >= BreakTarget) encounter.Broken = true;
             }
             else
             {
@@ -192,7 +197,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"HUMILITY {encounter.BreakProgress}/{Cfg.breakTarget}";
+            $"HUMILITY {encounter.BreakProgress}/{BreakTarget}";
     }
 
     /// <summary>
@@ -267,7 +272,7 @@ namespace SinWheel
             }
 
             encounter.BreakProgress++;
-            if (encounter.BreakProgress >= Cfg.breakTarget) encounter.Broken = true;
+            if (encounter.BreakProgress >= BreakTarget) encounter.Broken = true;
         }
 
         public override void OnBroken(BossEncounter encounter)
@@ -278,7 +283,7 @@ namespace SinWheel
         }
 
         public override string StatusText(BossEncounter encounter) =>
-            $"WOUNDS {encounter.BreakProgress}/{Cfg.breakTarget}";
+            $"WOUNDS {encounter.BreakProgress}/{BreakTarget}";
     }
 
     /// <summary>

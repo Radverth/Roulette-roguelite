@@ -36,6 +36,9 @@ namespace SinWheel
             _ctx.Buffs = new BuffSystem();
 
             _ctx.Run = new RunState();
+            _ctx.Marks = new MarkSystem(_ctx);
+            _ctx.Tables = new TableSystem(_ctx);
+            _ctx.Interludes = new InterludeSystem(_ctx);
             _ctx.Ring = new WheelRingSystem(_ctx);
             _ctx.Notice = new NoticeSystem(_ctx);
             _ctx.Streak = new StreakSystem(_ctx);
@@ -47,6 +50,7 @@ namespace SinWheel
             _ctx.Game = new GameManager(_ctx);
 
             _ctx.Debt.EnsureSeeded();
+            _ctx.Tables.ResetForRun();
             _ctx.Ring.Rebuild();
 
             _ctx.Hud = new HudController(_ctx);

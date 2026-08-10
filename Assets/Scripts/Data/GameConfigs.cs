@@ -214,5 +214,8 @@ namespace SinWheel
         public WheelConfig Wheel;
         public SinsConfig Sins;
         public UpgradesConfig Upgrades;
+        public TablesConfig Tables;
+        public MarksConfig Marks;
+        public InterludesConfig Interludes;
     }
 }
